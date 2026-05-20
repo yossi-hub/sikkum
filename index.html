@@ -32,11 +32,37 @@ body { font-family: 'Poppins', -apple-system, sans-serif; background: #f0ede8; c
 .prof-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; }
 .prof-name { font-family: 'League Spartan', sans-serif; font-size: 22px; font-weight: 700; color: #025db8; }
 .prof-meta { font-size: 13px; color: #888; margin-top: 3px; }
-.classe-block { background: #FFF9F2; border: 0.5px solid rgba(2,93,184,0.15); border-radius: 12px; margin-bottom: 1.25rem; overflow: hidden; }
-.classe-header { background: #025db8; padding: 0.85rem 1.25rem; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
+
+/* ── ACCORDÉON ── */
+.classe-block { background: #FFF9F2; border: 0.5px solid rgba(2,93,184,0.15); border-radius: 12px; margin-bottom: 0.75rem; overflow: hidden; transition: border-color .2s; }
+.classe-block.sent { border-color: #1d8653; }
+.classe-block.open { border-color: #025db8; box-shadow: 0 2px 12px rgba(2,93,184,0.1); }
+
+.classe-header {
+  background: #025db8;
+  padding: 0.85rem 1.25rem;
+  display: flex; align-items: center; justify-content: space-between;
+  flex-wrap: wrap; gap: 8px;
+  cursor: pointer;
+  user-select: none;
+  transition: background .2s;
+}
+.classe-block.sent .classe-header { background: #1d8653; }
+.classe-header:hover { filter: brightness(1.08); }
+
+.classe-header-left { display: flex; align-items: center; gap: 10px; }
 .classe-title { font-family: 'League Spartan', sans-serif; font-size: 18px; font-weight: 700; color: #fff; }
-.classe-tags { display: flex; gap: 6px; flex-wrap: wrap; }
+.classe-tags { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
 .tag { display: inline-block; background: rgba(255,255,255,0.2); color: #fff; border-radius: 20px; font-size: 11px; padding: 2px 10px; }
+.tag-sent { background: rgba(255,255,255,0.35); font-weight: 700; }
+
+.chevron { color: rgba(255,255,255,0.8); font-size: 18px; transition: transform .25s; flex-shrink: 0; }
+.classe-block.open .chevron { transform: rotate(180deg); }
+
+/* Corps de la classe — caché par défaut */
+.classe-body { display: none; }
+.classe-block.open .classe-body { display: block; }
+
 .infos-classe { padding: 1rem 1.25rem; border-bottom: 0.5px solid rgba(2,93,184,0.1); }
 .infos-grid { display: grid; grid-template-columns: auto 1fr; gap: 10px; align-items: start; }
 .infos-full { grid-column: 1 / -1; }
@@ -58,11 +84,14 @@ textarea.eval { width: 100%; min-height: 48px; padding: 6px 8px; border-radius: 
 textarea.eval:focus { outline: none; border-color: #025db8; }
 select.passage { padding: 6px 8px; border-radius: 8px; border: 0.5px solid rgba(2,93,184,0.2); font-family: 'Poppins', sans-serif; font-size: 12px; background: #fff; direction: rtl; color: #2e2e2e; width: 100%; }
 select.passage:focus { outline: none; border-color: #025db8; }
-.submit-area { text-align: center; margin-top: 1.5rem; direction: ltr; }
-.btn-submit { padding: 14px 44px; border-radius: 10px; border: none; background: #f55700; color: #fff; font-family: 'League Spartan', sans-serif; font-size: 17px; font-weight: 700; cursor: pointer; }
-.btn-submit:hover { background: #d94a00; }
-.btn-submit:disabled { background: #bbb; cursor: not-allowed; }
-.submit-note { font-size: 12px; color: #aaa; margin-top: 8px; }
+
+.class-submit-area { padding: 1rem 1.25rem; border-top: 0.5px solid rgba(2,93,184,0.1); display: flex; align-items: center; justify-content: space-between; gap: 12px; direction: ltr; }
+.btn-submit-class { padding: 11px 28px; border-radius: 10px; border: none; background: #f55700; color: #fff; font-family: 'League Spartan', sans-serif; font-size: 15px; font-weight: 700; cursor: pointer; transition: background .15s; white-space: nowrap; }
+.btn-submit-class:hover { background: #d94a00; }
+.btn-submit-class:disabled { background: #bbb; cursor: not-allowed; }
+.btn-submit-class.done { background: #1d8653; cursor: default; }
+.submit-class-note { font-size: 12px; color: #aaa; }
+
 .loading { text-align: center; padding: 3rem 1rem; color: #888; font-size: 14px; direction: ltr; }
 .spinner { display: inline-block; width: 22px; height: 22px; border: 2px solid #ddd; border-top-color: #025db8; border-radius: 50%; animation: spin 0.8s linear infinite; margin-bottom: 10px; }
 @keyframes spin { to { transform: rotate(360deg); } }
@@ -102,30 +131,17 @@ const TABLE_CLASSES  = 'tblTs7XeOJbkEcSf1';
 const TABLE_STUDENTS = 'tblnFCt3Ne5oHwhlr';
 const TABLE_PRESENCE = 'tblVpk0mZAYBAuCGG';
 const TABLE_RAPPORTS = 'tblpXR4YXdAhqlCqA';
-const FT_NAME  = 'fld2bcymkalpLfk5r';
-const FT_EMAIL = 'fldNag9PeWZvCijNV';
-const FT_CLASS = 'fldMzwjLSPHOUJlHZ';
-const FC_NUM   = 'fldcKQPOroEmSYmwE';
-const FC_STUD  = 'fldFgC40O96SCnZnG';
-const FC_CHAP  = 'fldedo3AHC5u6o7pZ';
-const FC_NIV   = 'fld2E7XYUsEBuPBPx';
-const FC_STAT  = 'fldwfIvxjy0RU9ske';
-const FS_NAME  = 'fld52H73jX8ISBZ4h';
-const FP_NAME  = 'fldYNq644QnAawTJM';
-const FP_COUNT = 'fldtMQXKS1dLt6zti';
-
-let state = { teacher: null, classes: [], students: {}, presences: {} };
 
 const AIRTABLE_KEY = 'patQN9qTSmLV5aKkl.27894395be4f0d150d7d26f35598c9e9fefdef6ee976dbad3dfecb9464a602f8';
+
+let sentClasses = {};
+let state = { teacher: null, classes: [], students: {}, presences: {} };
 
 async function api(base, table, params='', method='GET', body=null) {
   const url = `https://api.airtable.com/v0/${base}/${table}${params}`;
   const opts = {
     method: method || 'GET',
-    headers: {
-      'Authorization': 'Bearer ' + AIRTABLE_KEY,
-      'Content-Type': 'application/json'
-    }
+    headers: { 'Authorization': 'Bearer ' + AIRTABLE_KEY, 'Content-Type': 'application/json' }
   };
   if (body) opts.body = JSON.stringify(body);
   const res = await fetch(url, opts);
@@ -138,9 +154,7 @@ async function getAll(base, table, params='') {
   let records=[], offset=null;
   do {
     let url = params || '';
-    if (offset) {
-      url = url ? `${url}&offset=${offset}` : `?offset=${offset}`;
-    }
+    if (offset) url = url ? `${url}&offset=${offset}` : `?offset=${offset}`;
     const data = await api(base, table, url);
     records = records.concat(data.records || []);
     offset = data.offset || null;
@@ -151,7 +165,7 @@ async function getAll(base, table, params='') {
 function setRoot(html) { document.getElementById('root').innerHTML = html; }
 function loading(msg) { setRoot(`<div class="loading"><div class="spinner"></div><br>${msg}</div>`); }
 
-function init() { renderLogin(); }
+function init() { sentClasses = {}; renderLogin(); }
 
 function renderLogin(err) {
   setRoot(`
@@ -175,10 +189,7 @@ async function loginByEmail() {
   loading('Vérification...');
   try {
     const recs = await getAll(BASE_COURS, TABLE_TEACHERS, '');
-    const found = recs.find(r => {
-      const e = (r.fields['Email'] || '').trim().toLowerCase();
-      return e === email;
-    });
+    const found = recs.find(r => (r.fields['Email'] || '').trim().toLowerCase() === email);
     if (!found) { renderLogin('Adresse email non reconnue. Vérifiez l\'orthographe ou contactez l\'administration.'); return; }
     const classIds = found.fields['Classes 5786'] || [];
     state.teacher = { id: found.id, name: (found.fields['Name'] || '').trim(), email: found.fields['Email'] || '', classIds };
@@ -195,42 +206,47 @@ async function loadClasses() {
       const cls = await api(BASE_COURS, TABLE_CLASSES, `/${cid}`);
       const f = cls.fields;
       if (!['Complete', 'In Progress'].includes(f['Status'])) continue;
-      const studentIds = f['Students'] || [];
-      const num = f['Numéro de Classe'] || f['Name'] || cid;
       state.classes.push({
         id: cid,
-        num,
+        num: f['Numéro de Classe'] || f['Name'] || cid,
         chapitre: f['Chapitre en cours'] || '',
         niveau: f['Niveau'] || '',
-        studentIds
+        studentIds: f['Students'] || []
       });
     }
-
     const allStudentIds = [...new Set(state.classes.flatMap(c => c.studentIds))];
     for (let i = 0; i < allStudentIds.length; i += 10) {
       const batch = allStudentIds.slice(i, i + 10);
       const formula = encodeURIComponent(`OR(${batch.map(id => `RECORD_ID()="${id}"`).join(',')})`);
       const res = await api(BASE_COURS, TABLE_STUDENTS, `?filterByFormula=${formula}`);
-      for (const r of (res.records || [])) {
-        state.students[r.id] = (r.fields['Name'] || r.id).trim();
-      }
+      for (const r of (res.records || [])) state.students[r.id] = (r.fields['Name'] || r.id).trim();
     }
-
     loading('Chargement des présences...');
     const studentNames = Object.values(state.students);
     state.presences = {};
     for (let i = 0; i < studentNames.length; i += 10) {
       const batch = studentNames.slice(i, i + 10);
-      const formula = encodeURIComponent(`OR(${batch.map(n => `{Name}="${n.replace(/"/g, '\\"')}"`).join(',')})`);
+      const formula = encodeURIComponent(`OR(${batch.map(n => `{Name}="${n.replace(/"/g,'\\"')}"`).join(',')})`);
       const res = await api(BASE_PRESENCE, TABLE_PRESENCE, `?filterByFormula=${formula}`);
       for (const r of (res.records || [])) {
         const n = (r.fields['Name'] || '').trim();
         if (n) state.presences[n] = r.fields['Nombre de présences'] || 0;
       }
     }
-
     renderForm();
   } catch(e) { setRoot(`<div class="error-msg">Erreur : ${e.message}</div>`); }
+}
+
+// ── ACCORDÉON : ouvre une classe, ferme les autres ──
+function toggleClass(classId) {
+  const blocks = document.querySelectorAll('.classe-block');
+  blocks.forEach(b => {
+    if (b.id === `block-${classId}`) {
+      b.classList.toggle('open');
+    } else {
+      b.classList.remove('open');
+    }
+  });
 }
 
 function renderForm() {
@@ -244,102 +260,172 @@ function renderForm() {
       <button class="btn-ghost" onclick="init()">← התנתקות</button>
     </div>`;
 
-  for (const cls of state.classes) {
+  state.classes.forEach((cls, idx) => {
+    const isSent = sentClasses[cls.id] === 'sent';
+    // La première classe non-envoyée s'ouvre automatiquement
+    const isOpen = idx === 0;
+
     html += `
-    <div class="classe-block">
-      <div class="classe-header">
-        <div class="classe-title">כיתה ${cls.num}</div>
-        <div class="classe-tags">
-          ${cls.niveau?`<span class="tag">${cls.niveau}</span>`:''}
-          <span class="tag">${cls.studentIds.length} תלמידים</span>
-          ${cls.chapitre?`<span class="tag">פרק ${cls.chapitre}</span>`:''}
-        </div>
-      </div>
-      <div class="infos-classe">
-        <div class="infos-grid">
-          <div class="field-group">
-            <label class="field-label">עד איזה פרק הגענו?</label>
-            <input type="number" class="field-input" id="perek-${cls.id}" value="${cls.chapitre||''}" min="1" max="60" />
-          </div>
-          <div></div>
-          <div class="field-group infos-full">
-            <label class="field-label">מה הספקנו — contenu couvert</label>
-            <textarea class="field-input" id="contenu-${cls.id}" rows="2" placeholder="שלבים שהושלמו, נושאים שנלמדו..."></textarea>
-          </div>
-          <div class="field-group infos-full">
-            <label class="field-label">הערות פדגוגיות — remarques générales</label>
-            <textarea class="field-input" id="remarques-${cls.id}" rows="2" placeholder="דינמיקה של הכיתה, אתגרים..."></textarea>
+    <div class="classe-block${isSent?' sent':''}${isOpen?' open':''}" id="block-${cls.id}">
+      <div class="classe-header" onclick="toggleClass('${cls.id}')">
+        <div class="classe-header-left">
+          <div class="classe-title">כיתה ${cls.num}</div>
+          <div class="classe-tags">
+            ${cls.niveau ? `<span class="tag">${cls.niveau}</span>` : ''}
+            <span class="tag">${cls.studentIds.length} תלמידים</span>
+            ${cls.chapitre ? `<span class="tag">פרק ${cls.chapitre}</span>` : ''}
+            ${isSent ? `<span class="tag tag-sent">✓ נשלח</span>` : ''}
           </div>
         </div>
+        <span class="chevron">▾</span>
       </div>
-      <div class="students-wrap">
-        <table class="students">
-          <thead><tr>
-            <th>שם התלמיד/ה</th>
-            <th style="width:90px;text-align:center;">נוכחות</th>
-            <th style="min-width:190px;">הערכה אישית</th>
-            <th style="width:135px;">המשך לרמה הבאה?</th>
-          </tr></thead>
-          <tbody>`;
+
+      <div class="classe-body">
+        <div class="infos-classe">
+          <div class="infos-grid">
+            <div class="field-group">
+              <label class="field-label">עד איזה פרק הגענו?</label>
+              <input type="number" class="field-input" id="perek-${cls.id}" value="${cls.chapitre||''}" min="1" max="60" ${isSent?'disabled':''} />
+            </div>
+            <div></div>
+            <div class="field-group infos-full">
+              <label class="field-label">מה הספקנו — contenu couvert</label>
+              <textarea class="field-input" id="contenu-${cls.id}" rows="2" placeholder="שלבים שהושלמו, נושאים שנלמדו..." ${isSent?'disabled':''}></textarea>
+            </div>
+            <div class="field-group infos-full">
+              <label class="field-label">הערות פדגוגיות — remarques générales</label>
+              <textarea class="field-input" id="remarques-${cls.id}" rows="2" placeholder="דינמיקה של הכיתה, אתגרים..." ${isSent?'disabled':''}></textarea>
+            </div>
+          </div>
+        </div>
+        <div class="students-wrap">
+          <table class="students">
+            <thead><tr>
+              <th>שם התלמיד/ה</th>
+              <th style="width:90px;text-align:center;">נוכחות</th>
+              <th style="min-width:190px;">הערכה אישית</th>
+              <th style="width:135px;">המשך לרמה הבאה?</th>
+            </tr></thead>
+            <tbody>`;
+
     for (const sid of cls.studentIds) {
-      const name = state.students[sid]||sid;
+      const name = state.students[sid] || sid;
       const pres = state.presences[name];
-      const presHtml = pres!==undefined ? `<span class="badge-pres">${pres}</span>` : `<span class="badge-pres badge-unknown">—</span>`;
+      const presHtml = pres !== undefined
+        ? `<span class="badge-pres">${pres}</span>`
+        : `<span class="badge-pres badge-unknown">—</span>`;
       html += `<tr>
         <td class="student-name">${name}</td>
         <td style="text-align:center;">${presHtml}</td>
-        <td><textarea class="eval" id="eval-${cls.id}-${sid}" placeholder="הערות..."></textarea></td>
-        <td><select class="passage" id="passage-${cls.id}-${sid}">
-          <option value="">—</option><option value="כן">כן ✓</option><option value="לא">לא ✗</option><option value="לדון">לדון ?</option>
+        <td><textarea class="eval" id="eval-${cls.id}-${sid}" placeholder="הערות..." ${isSent?'disabled':''}></textarea></td>
+        <td><select class="passage" id="passage-${cls.id}-${sid}" ${isSent?'disabled':''}>
+          <option value="">—</option>
+          <option value="כן">כן ✓</option>
+          <option value="לא">לא ✗</option>
+          <option value="לדון">לדון ?</option>
         </select></td>
       </tr>`;
     }
-    html += `</tbody></table></div></div>`;
-  }
 
-  html += `<div class="submit-area">
-    <button class="btn-submit" id="btn-submit" onclick="submitAll()">✉ שמירה ושליחה — סיום הדוח</button>
-    <div class="submit-note">Toutes les données seront enregistrées dans Airtable</div>
-  </div>`;
+    html += `</tbody></table></div>
+        <div class="class-submit-area">
+          <div class="submit-class-note">${isSent ? 'Classe enregistrée dans Airtable ✓' : 'Enregistre uniquement cette classe'}</div>
+          <button
+            class="btn-submit-class${isSent?' done':''}"
+            id="btn-${cls.id}"
+            onclick="submitClass('${cls.id}')"
+            ${isSent?'disabled':''}
+          >${isSent ? '✓ נשלח' : '✉ שמירה ושליחה'}</button>
+        </div>
+      </div>
+    </div>`;
+  });
+
   setRoot(html);
 }
 
-async function submitAll() {
-  const btn = document.getElementById('btn-submit');
-  btn.disabled = true; btn.textContent = 'שומר...';
+async function submitClass(classId) {
+  const cls = state.classes.find(c => c.id === classId);
+  if (!cls) return;
+
+  const btn = document.getElementById(`btn-${classId}`);
+  btn.disabled = true;
+  btn.textContent = 'שומר...';
+
   const now = new Date().toISOString();
-  let records = [];
-  for (const cls of state.classes) {
-    const perek = document.getElementById(`perek-${cls.id}`)?.value;
-    const contenu = document.getElementById(`contenu-${cls.id}`)?.value||'';
-    const remarques = document.getElementById(`remarques-${cls.id}`)?.value||'';
-    for (const sid of cls.studentIds) {
-      const name = state.students[sid]||sid;
-      const pres = state.presences[name];
-      const evalVal = document.getElementById(`eval-${cls.id}-${sid}`)?.value||'';
-      const passage = document.getElementById(`passage-${cls.id}-${sid}`)?.value||'';
-      records.push({ fields: {
-        'fldv20CiFCcpI5D0a': name, 'fld5pPY7sfAzWNFJB': cls.num, 'fldUqnBJ4rcoXUZw1': state.teacher.name,
-        'fldcnIaGnFqbmvgCk': typeof pres==='number'?pres:0, 'fldBkPM3GLSEh9ocV': evalVal,
-        'fldsjADeAmUvt8zvO': passage||null, 'fldR4g4kg2q3t1BPr': perek?parseInt(perek):null,
-        'fldMJlONdkB6SJANA': contenu, 'fldD7fivLb4cV91Uc': remarques, 'fldjrcq6Y3qfsICAi': now
-      }});
-    }
-  }
+  const perek     = document.getElementById(`perek-${classId}`)?.value;
+  const contenu   = document.getElementById(`contenu-${classId}`)?.value || '';
+  const remarques = document.getElementById(`remarques-${classId}`)?.value || '';
+
+  const records = cls.studentIds.map(sid => {
+    const name    = state.students[sid] || sid;
+    const pres    = state.presences[name];
+    const evalVal = document.getElementById(`eval-${classId}-${sid}`)?.value || '';
+    const passage = document.getElementById(`passage-${classId}-${sid}`)?.value || '';
+    return { fields: {
+      'fldv20CiFCcpI5D0a': name,
+      'fld5pPY7sfAzWNFJB': cls.num,
+      'fldUqnBJ4rcoXUZw1': state.teacher.name,
+      'fldcnIaGnFqbmvgCk': typeof pres === 'number' ? pres : 0,
+      'fldBkPM3GLSEh9ocV': evalVal,
+      'fldsjADeAmUvt8zvO': passage || null,
+      'fldR4g4kg2q3t1BPr': perek ? parseInt(perek) : null,
+      'fldMJlONdkB6SJANA': contenu,
+      'fldD7fivLb4cV91Uc': remarques,
+      'fldjrcq6Y3qfsICAi': now
+    }};
+  });
+
   try {
-    for (let i=0; i<records.length; i+=10) {
-      await api(BASE_COURS, TABLE_RAPPORTS, '', 'POST', { records: records.slice(i,i+10) });
+    for (let i = 0; i < records.length; i += 10) {
+      await api(BASE_COURS, TABLE_RAPPORTS, '', 'POST', { records: records.slice(i, i + 10) });
     }
-    setRoot(`<div class="success-screen">
-      <div class="success-icon">✅</div>
-      <h2>הדוח נשמר בהצלחה!</h2>
-      <p>${records.length} תלמידים נשמרו ב-Airtable</p>
-      <p style="margin-top:6px;">תודה רבה, ${state.teacher.name}!</p>
-      <button class="btn-ghost" style="margin-top:1.5rem;" onclick="init()">← חזור לדף הכניסה</button>
-    </div>`);
+
+    sentClasses[classId] = 'sent';
+
+    const block = document.getElementById(`block-${classId}`);
+    if (block) {
+      block.classList.add('sent');
+      block.classList.remove('open');
+      block.querySelector('.classe-header').style.background = '#1d8653';
+      const tags = block.querySelector('.classe-tags');
+      if (tags && !tags.querySelector('.tag-sent')) {
+        tags.insertAdjacentHTML('beforeend', `<span class="tag tag-sent">✓ נשלח</span>`);
+      }
+      block.querySelectorAll('input, textarea, select').forEach(el => el.disabled = true);
+      btn.classList.add('done');
+      btn.textContent = '✓ נשלח';
+      btn.disabled = true;
+      const note = block.querySelector('.submit-class-note');
+      if (note) note.textContent = 'Classe enregistrée dans Airtable ✓';
+    }
+
+    // Ouvrir automatiquement la prochaine classe non envoyée
+    const nextCls = state.classes.find(c => !sentClasses[c.id]);
+    if (nextCls) {
+      document.querySelectorAll('.classe-block').forEach(b => b.classList.remove('open'));
+      const nextBlock = document.getElementById(`block-${nextCls.id}`);
+      if (nextBlock) {
+        nextBlock.classList.add('open');
+        nextBlock.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    } else {
+      // Toutes envoyées
+      const total = state.classes.reduce((acc, c) => acc + c.studentIds.length, 0);
+      setRoot(`<div class="success-screen">
+        <div class="success-icon">✅</div>
+        <h2>הדוח נשמר בהצלחה!</h2>
+        <p>${total} תלמידים נשמרו ב-Airtable</p>
+        <p style="margin-top:6px;">תודה רבה, ${state.teacher.name}!</p>
+        <button class="btn-ghost" style="margin-top:1.5rem;" onclick="init()">← חזור לדף הכניסה</button>
+      </div>`);
+    }
+
   } catch(e) {
-    btn.disabled=false; btn.textContent='✉ שמירה ושליחה — סיום הדוח';
-    document.getElementById('root').insertAdjacentHTML('afterbegin',`<div class="error-msg">Erreur : ${e.message}</div>`);
+    btn.disabled = false;
+    btn.textContent = '✉ שמירה ושליחה';
+    document.getElementById(`block-${classId}`)
+      .insertAdjacentHTML('afterbegin', `<div class="error-msg" style="margin:0.75rem 1.25rem;">Erreur : ${e.message}</div>`);
   }
 }
 
