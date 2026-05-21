@@ -222,17 +222,22 @@ async function loadClasses() {
       for (const r of (res.records || [])) state.students[r.id] = (r.fields['Name'] || r.id).trim();
     }
     loading('Chargement des présences...');
-    const studentNames = Object.values(state.students);
     state.presences = {};
-    for (let i = 0; i < studentNames.length; i += 10) {
-      const batch = studentNames.slice(i, i + 10);
-      const formula = encodeURIComponent(`OR(${batch.map(n => `{Name}="${n.replace(/"/g,'\\"')}"`).join(',')})`);
-      const res = await api(BASE_PRESENCE, TABLE_PRESENCE, `?filterByFormula=${formula}`);
-      for (const r of (res.records || [])) {
+
+    // Pour chaque classe, on récupère les présences filtrées par numéro de classe
+    // et on indexe par clé "NomEleve__NumeroClasse"
+    for (const cls of state.classes) {
+      const formula = encodeURIComponent(`{Classe}="${cls.num}"`);
+      const res = await getAll(BASE_PRESENCE, TABLE_PRESENCE, `?filterByFormula=${formula}`);
+      for (const r of res) {
         const n = (r.fields['Name'] || '').trim();
-        if (n) state.presences[n] = r.fields['Nombre de présences'] || 0;
+        if (n) {
+          const key = `${n}__${cls.num}`;
+          state.presences[key] = r.fields['Nombre de présences'] || 0;
+        }
       }
     }
+
     renderForm();
   } catch(e) { setRoot(`<div class="error-msg">Erreur : ${e.message}</div>`); }
 }
@@ -262,7 +267,6 @@ function renderForm() {
 
   state.classes.forEach((cls, idx) => {
     const isSent = sentClasses[cls.id] === 'sent';
-    // La première classe non-envoyée s'ouvre automatiquement
     const isOpen = idx === 0;
 
     html += `
@@ -308,9 +312,18 @@ function renderForm() {
             </tr></thead>
             <tbody>`;
 
-    for (const sid of cls.studentIds) {
+    const sortedStudentIds = [...cls.studentIds].sort((a, b) => {
+      const nameA = state.students[a] || a;
+      const nameB = state.students[b] || b;
+      const presA = state.presences[`${nameA}__${cls.num}`] ?? -1;
+      const presB = state.presences[`${nameB}__${cls.num}`] ?? -1;
+      return presB - presA;
+    });
+
+    for (const sid of sortedStudentIds) {
       const name = state.students[sid] || sid;
-      const pres = state.presences[name];
+      const presKey = `${name}__${cls.num}`;
+      const pres = state.presences[presKey];
       const presHtml = pres !== undefined
         ? `<span class="badge-pres">${pres}</span>`
         : `<span class="badge-pres badge-unknown">—</span>`;
@@ -359,7 +372,9 @@ async function submitClass(classId) {
 
   const records = cls.studentIds.map(sid => {
     const name    = state.students[sid] || sid;
-    const pres    = state.presences[name];
+    // ── CORRECTION : clé nom + numéro de classe ──
+    const presKey = `${name}__${cls.num}`;
+    const pres    = state.presences[presKey];
     const evalVal = document.getElementById(`eval-${classId}-${sid}`)?.value || '';
     const passage = document.getElementById(`passage-${classId}-${sid}`)?.value || '';
     return { fields: {
