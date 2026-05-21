@@ -312,9 +312,16 @@ function renderForm() {
             </tr></thead>
             <tbody>`;
 
-    for (const sid of cls.studentIds) {
+    const sortedStudentIds = [...cls.studentIds].sort((a, b) => {
+      const nameA = state.students[a] || a;
+      const nameB = state.students[b] || b;
+      const presA = state.presences[`${nameA}__${cls.num}`] ?? -1;
+      const presB = state.presences[`${nameB}__${cls.num}`] ?? -1;
+      return presB - presA;
+    });
+
+    for (const sid of sortedStudentIds) {
       const name = state.students[sid] || sid;
-      // ── CORRECTION : clé nom + numéro de classe ──
       const presKey = `${name}__${cls.num}`;
       const pres = state.presences[presKey];
       const presHtml = pres !== undefined
