@@ -115,6 +115,18 @@ textarea.bakasha-input { min-height: 80px; resize: vertical; }
 .bakasha-success h2 { font-family: 'League Spartan', sans-serif; font-size: 20px; font-weight: 700; color: #1d8653; margin-bottom: 8px; }
 .bakasha-success p { font-size: 14px; color: #666; }
 
+/* ── ACCUEIL ── */
+.welcome-screen { max-width: 560px; margin: 2.5rem auto; text-align: center; }
+.welcome-name { font-family: 'League Spartan', sans-serif; font-size: 24px; font-weight: 700; color: #025db8; margin-bottom: 4px; }
+.welcome-sub { font-size: 13px; color: #888; margin-bottom: 2rem; direction: ltr; }
+.welcome-cards { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+.welcome-card { background: #FFF9F2; border: 0.5px solid rgba(2,93,184,0.2); border-radius: 14px; padding: 2rem 1.5rem; cursor: pointer; transition: transform .15s, box-shadow .15s, border-color .15s; text-align: center; }
+.welcome-card:hover { transform: translateY(-3px); box-shadow: 0 6px 20px rgba(2,93,184,0.12); border-color: #025db8; }
+.welcome-card-icon { font-size: 36px; margin-bottom: 0.75rem; }
+.welcome-card-title { font-family: 'League Spartan', sans-serif; font-size: 16px; font-weight: 700; color: #2e2e2e; margin-bottom: 6px; }
+.welcome-card-desc { font-size: 12px; color: #888; line-height: 1.5; direction: ltr; }
+@media (max-width: 500px) { .welcome-cards { grid-template-columns: 1fr; } }
+
 /* ── SHARED ── */
 .loading { text-align: center; padding: 3rem 1rem; color: #888; font-size: 14px; direction: ltr; }
 .spinner { display: inline-block; width: 22px; height: 22px; border: 2px solid #ddd; border-top-color: #025db8; border-radius: 50%; animation: spin 0.8s linear infinite; margin-bottom: 10px; }
@@ -266,6 +278,37 @@ function renderLogin(err) {
 
 function logout() { init(); }
 
+function renderWelcome() {
+  hideTabs();
+  setRoot(`
+    <div class="welcome-screen">
+      <div class="welcome-name">שלום, ${state.teacher.name}! 👋</div>
+      <div class="welcome-sub">Que souhaitez-vous faire aujourd'hui ?</div>
+      <div class="welcome-cards">
+        <div class="welcome-card" onclick="openTab('sikkum')">
+          <div class="welcome-card-icon">📋</div>
+          <div class="welcome-card-title">דוח סיום שנה</div>
+          <div class="welcome-card-desc">Rapport de fin d'année — évaluations et bilan par classe</div>
+        </div>
+        <div class="welcome-card" onclick="openTab('bakasha')">
+          <div class="welcome-card-icon">📝</div>
+          <div class="welcome-card-title">בקשות לשנה הבאה</div>
+          <div class="welcome-card-desc">Vos préférences et demandes pour l'année 5787</div>
+        </div>
+      </div>
+    </div>
+  `);
+}
+
+async function openTab(tabName) {
+  if (!state.classes.length) {
+    await loadClasses(tabName);
+  } else {
+    showTabs();
+    switchTab(tabName);
+  }
+}
+
 async function loginByEmail() {
   const email = (document.getElementById('email-input')?.value || '').trim().toLowerCase();
   if (!email) return;
@@ -280,12 +323,12 @@ async function loginByEmail() {
     state.teacher = { id: found.id, name: (found.fields['Name'] || '').trim(), email: found.fields['Email'] || '', classIds: found.fields['Classes 5786'] || [] };
     if (!state.teacher.classIds.length) { renderLogin('Aucune classe trouvée pour cet email.'); return; }
     renderHeaderUser(state.teacher);
-    await loadClasses();
+    renderWelcome();
   } catch(e) { setRoot(`<div class="error-msg">Erreur : ${e.message}</div>`); }
 }
 
 // ── CHARGEMENT ──
-async function loadClasses() {
+async function loadClasses(targetTab) {
   loading('Chargement de vos classes...');
   try {
     state.classes = []; state.students = {};
@@ -312,11 +355,12 @@ async function loadClasses() {
         if (n) state.presences[`${n}__${cls.num}`] = r.fields['Nombre de présences'] || 0;
       }
     }
-    // Afficher les onglets et rendre le formulaire dans l'onglet 1
+    // Afficher les onglets
     showTabs();
     const sikkumHtml = buildSikkumHtml();
     setTab('sikkum', sikkumHtml);
     setTab('bakasha', ''); // sera rendu au clic
+    switchTab(targetTab || 'sikkum');
   } catch(e) { setRoot(`<div class="error-msg">Erreur : ${e.message}</div>`); }
 }
 
