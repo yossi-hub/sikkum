@@ -589,13 +589,13 @@ async function submitBakasha() {
   errDiv.innerHTML = '';
 
   const fields = {
-    'Teacher':                        state.teacher.email,
-    'המשך שיעורים קיימים ?':         document.getElementById('bk-continue')?.value || '',
-    'שיעורים שאינך רוצה להמשיך ?':  document.getElementById('bk-stop')?.value || '',
-    'מספר הכיתות הכולל':             document.getElementById('bk-total')?.value || '',
-    'ימים מועדפים':                   document.getElementById('bk-days-ok')?.value || '',
-    'ימים שאינם מתאימים':            document.getElementById('bk-days-no')?.value || '',
-    'כל מה שחשוב לך לשתף':          document.getElementById('bk-notes')?.value || '',
+    'Teacher':                       state.teacher.email,
+    'המשך שיעורים קיימים':          document.getElementById('bk-continue')?.value || '',
+    'שיעורים שאינך רוצה להמשיך':   document.getElementById('bk-stop')?.value || '',
+    'מספר הכיתות הכולל':            document.getElementById('bk-total')?.value || '',
+    'ימים מועדפים':                  document.getElementById('bk-days-ok')?.value || '',
+    'ימים שאינם מתאימים':           document.getElementById('bk-days-no')?.value || '',
+    'כל מה שחשוב לך לשתף':         document.getElementById('bk-notes')?.value || '',
   };
 
   try {
