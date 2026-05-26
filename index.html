@@ -301,7 +301,10 @@ function renderWelcome() {
 }
 
 async function openTab(tabName) {
-  if (!state.classes.length) {
+  if (tabName === 'bakasha') {
+    showTabs();
+    switchTab('bakasha');
+  } else if (!state.classes.length) {
     await loadClasses(tabName);
   } else {
     showTabs();
@@ -540,13 +543,13 @@ function renderBakasha() {
         </div>
 
         <div class="bakasha-field">
-          <label class="bakasha-label">המשך שיעורים קיימים ?</label>
+          <label class="bakasha-label">המשך שיעורים קיימים</label>
           <div class="bakasha-hint">אילו כיתות היית רוצה להמשיך בשנה הבאה</div>
           <textarea class="bakasha-input" id="bk-continue" rows="3" placeholder="..."></textarea>
         </div>
 
         <div class="bakasha-field">
-          <label class="bakasha-label">שיעורים שאינך רוצה להמשיך ?</label>
+          <label class="bakasha-label">שיעורים שאינך רוצה להמשיך</label>
           <div class="bakasha-hint">יש כיתות שתרצה/י להפסיק</div>
           <textarea class="bakasha-input" id="bk-stop" rows="3" placeholder="..."></textarea>
         </div>
