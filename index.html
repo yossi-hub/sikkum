@@ -9,15 +9,27 @@
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body { font-family: 'Poppins', -apple-system, sans-serif; background: #f0ede8; color: #2e2e2e; direction: rtl; min-height: 100vh; }
 .page { max-width: 880px; margin: 0 auto; padding: 0 0 3rem; }
-.app-header { background: #025db8; padding: 1rem 1.5rem; display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.5rem; }
+.app-header { background: #025db8; padding: 1rem 1.5rem; display: flex; align-items: center; justify-content: space-between; margin-bottom: 0; }
 .logo { font-family: 'League Spartan', sans-serif; font-weight: 700; font-size: 24px; color: #fff; line-height: 1.1; }
 .logo span { display: block; }
 .logo .lavi { padding-right: 20px; }
 .header-right { text-align: left; direction: ltr; }
 .header-title { color: #fff; font-family: 'League Spartan', sans-serif; font-size: 15px; font-weight: 600; }
 .header-sub { color: rgba(255,255,255,0.65); font-size: 12px; margin-top: 2px; }
+
+/* ── ONGLETS ── */
+.tabs-bar { background: #025db8; padding: 0 1.5rem; display: flex; gap: 4px; border-top: 1px solid rgba(255,255,255,0.15); }
+.tab-btn { padding: 10px 18px; font-family: 'League Spartan', sans-serif; font-size: 14px; font-weight: 600; color: rgba(255,255,255,0.65); background: transparent; border: none; border-bottom: 3px solid transparent; cursor: pointer; transition: color .15s, border-color .15s; white-space: nowrap; }
+.tab-btn:hover { color: rgba(255,255,255,0.9); }
+.tab-btn.active { color: #fff; border-bottom-color: #f55700; }
+.tabs-content { margin-top: 1.5rem; }
+.tab-panel { display: none; }
+.tab-panel.active { display: block; }
+
 .content { padding: 0 1.25rem; }
 .card { background: #FFF9F2; border: 0.5px solid rgba(2,93,184,0.15); border-radius: 12px; padding: 1.25rem; margin-bottom: 1rem; }
+
+/* ── LOGIN ── */
 .login-card { max-width: 460px; margin: 2rem auto; text-align: center; }
 .login-title { font-family: 'League Spartan', sans-serif; font-size: 20px; font-weight: 700; color: #025db8; margin-bottom: 6px; }
 .login-sub { font-size: 13px; color: #888; margin-bottom: 1.25rem; direction: ltr; }
@@ -27,42 +39,30 @@ body { font-family: 'Poppins', -apple-system, sans-serif; background: #f0ede8; c
 .btn-blue { padding: 10px 22px; border-radius: 8px; border: none; background: #025db8; color: #fff; font-family: 'Poppins', sans-serif; font-size: 14px; font-weight: 500; cursor: pointer; white-space: nowrap; }
 .btn-blue:hover { background: #014fa0; }
 .btn-blue:disabled { background: #aaa; cursor: not-allowed; }
+.btn-logout { padding: 5px 12px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.3); background: transparent; color: rgba(255,255,255,0.85); font-family: 'Poppins', sans-serif; font-size: 12px; cursor: pointer; transition: background .15s; white-space: nowrap; }
+.btn-logout:hover { background: rgba(255,255,255,0.12); }
 .btn-ghost { padding: 8px 16px; border-radius: 8px; border: 0.5px solid rgba(2,93,184,0.3); background: transparent; color: #025db8; font-family: 'Poppins', sans-serif; font-size: 13px; cursor: pointer; }
 .btn-ghost:hover { background: rgba(2,93,184,0.05); }
+
+/* ── ONGLET 1 : SIKKUM ── */
 .prof-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1rem; }
 .prof-name { font-family: 'League Spartan', sans-serif; font-size: 22px; font-weight: 700; color: #025db8; }
 .prof-meta { font-size: 13px; color: #888; margin-top: 3px; }
-
-/* ── ACCORDÉON ── */
 .classe-block { background: #FFF9F2; border: 0.5px solid rgba(2,93,184,0.15); border-radius: 12px; margin-bottom: 0.75rem; overflow: hidden; transition: border-color .2s; }
 .classe-block.sent { border-color: #1d8653; }
 .classe-block.open { border-color: #025db8; box-shadow: 0 2px 12px rgba(2,93,184,0.1); }
-
-.classe-header {
-  background: #025db8;
-  padding: 0.85rem 1.25rem;
-  display: flex; align-items: center; justify-content: space-between;
-  flex-wrap: wrap; gap: 8px;
-  cursor: pointer;
-  user-select: none;
-  transition: background .2s;
-}
+.classe-header { background: #025db8; padding: 0.85rem 1.25rem; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; cursor: pointer; user-select: none; transition: background .2s; }
 .classe-block.sent .classe-header { background: #1d8653; }
 .classe-header:hover { filter: brightness(1.08); }
-
 .classe-header-left { display: flex; align-items: center; gap: 10px; }
 .classe-title { font-family: 'League Spartan', sans-serif; font-size: 18px; font-weight: 700; color: #fff; }
 .classe-tags { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
 .tag { display: inline-block; background: rgba(255,255,255,0.2); color: #fff; border-radius: 20px; font-size: 11px; padding: 2px 10px; }
 .tag-sent { background: rgba(255,255,255,0.35); font-weight: 700; }
-
 .chevron { color: rgba(255,255,255,0.8); font-size: 18px; transition: transform .25s; flex-shrink: 0; }
 .classe-block.open .chevron { transform: rotate(180deg); }
-
-/* Corps de la classe — caché par défaut */
 .classe-body { display: none; }
 .classe-block.open .classe-body { display: block; }
-
 .infos-classe { padding: 1rem 1.25rem; border-bottom: 0.5px solid rgba(2,93,184,0.1); }
 .infos-grid { display: grid; grid-template-columns: auto 1fr; gap: 10px; align-items: start; }
 .infos-full { grid-column: 1 / -1; }
@@ -84,7 +84,6 @@ textarea.eval { width: 100%; min-height: 48px; padding: 6px 8px; border-radius: 
 textarea.eval:focus { outline: none; border-color: #025db8; }
 select.passage { padding: 6px 8px; border-radius: 8px; border: 0.5px solid rgba(2,93,184,0.2); font-family: 'Poppins', sans-serif; font-size: 12px; background: #fff; direction: rtl; color: #2e2e2e; width: 100%; }
 select.passage:focus { outline: none; border-color: #025db8; }
-
 .class-submit-area { padding: 1rem 1.25rem; border-top: 0.5px solid rgba(2,93,184,0.1); display: flex; align-items: center; justify-content: space-between; gap: 12px; direction: ltr; }
 .btn-submit-class { padding: 11px 28px; border-radius: 10px; border: none; background: #f55700; color: #fff; font-family: 'League Spartan', sans-serif; font-size: 15px; font-weight: 700; cursor: pointer; transition: background .15s; white-space: nowrap; }
 .btn-submit-class:hover { background: #d94a00; }
@@ -92,6 +91,43 @@ select.passage:focus { outline: none; border-color: #025db8; }
 .btn-submit-class.done { background: #1d8653; cursor: default; }
 .submit-class-note { font-size: 12px; color: #aaa; }
 
+/* ── ONGLET 2 : BAKASHA ── */
+.bakasha-card { background: #FFF9F2; border: 0.5px solid rgba(2,93,184,0.15); border-radius: 12px; padding: 2rem 1.75rem; max-width: 680px; margin: 0 auto; }
+.bakasha-title { font-family: 'League Spartan', sans-serif; font-size: 20px; font-weight: 700; color: #025db8; margin-bottom: 4px; }
+.bakasha-sub { font-size: 13px; color: #888; margin-bottom: 1.75rem; direction: ltr; }
+.bakasha-fields { display: flex; flex-direction: column; gap: 1.1rem; }
+.bakasha-field { display: flex; flex-direction: column; gap: 5px; }
+.bakasha-label { font-size: 13px; font-weight: 600; color: #2e2e2e; }
+.bakasha-hint { font-size: 11px; color: #aaa; margin-top: 1px; }
+.bakasha-input { padding: 9px 12px; border-radius: 8px; border: 0.5px solid rgba(2,93,184,0.2); font-family: 'Poppins', sans-serif; font-size: 13px; color: #2e2e2e; background: #fff; direction: rtl; width: 100%; }
+.bakasha-input:focus { outline: none; border-color: #025db8; box-shadow: 0 0 0 3px rgba(2,93,184,0.08); }
+textarea.bakasha-input { min-height: 80px; resize: vertical; }
+.bakasha-teacher-row { display: flex; align-items: center; gap: 10px; padding: 9px 12px; border-radius: 8px; background: rgba(2,93,184,0.05); border: 0.5px solid rgba(2,93,184,0.15); direction: ltr; }
+.bakasha-teacher-email { font-size: 13px; color: #025db8; font-weight: 500; }
+.bakasha-teacher-lock { font-size: 14px; }
+.bakasha-submit-area { margin-top: 1.75rem; display: flex; align-items: center; justify-content: space-between; direction: ltr; gap: 12px; }
+.btn-submit-bakasha { padding: 12px 32px; border-radius: 10px; border: none; background: #f55700; color: #fff; font-family: 'League Spartan', sans-serif; font-size: 15px; font-weight: 700; cursor: pointer; transition: background .15s; }
+.btn-submit-bakasha:hover { background: #d94a00; }
+.btn-submit-bakasha:disabled { background: #bbb; cursor: not-allowed; }
+.bakasha-note { font-size: 12px; color: #aaa; direction: rtl; }
+.bakasha-success { text-align: center; padding: 3rem 1rem; direction: ltr; }
+.bakasha-success .success-icon { font-size: 44px; margin-bottom: 1rem; }
+.bakasha-success h2 { font-family: 'League Spartan', sans-serif; font-size: 20px; font-weight: 700; color: #1d8653; margin-bottom: 8px; }
+.bakasha-success p { font-size: 14px; color: #666; }
+
+/* ── ACCUEIL ── */
+.welcome-screen { max-width: 560px; margin: 2.5rem auto; text-align: center; }
+.welcome-name { font-family: 'League Spartan', sans-serif; font-size: 24px; font-weight: 700; color: #025db8; margin-bottom: 4px; }
+.welcome-sub { font-size: 13px; color: #888; margin-bottom: 2rem; direction: ltr; }
+.welcome-cards { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+.welcome-card { background: #FFF9F2; border: 0.5px solid rgba(2,93,184,0.2); border-radius: 14px; padding: 2rem 1.5rem; cursor: pointer; transition: transform .15s, box-shadow .15s, border-color .15s; text-align: center; }
+.welcome-card:hover { transform: translateY(-3px); box-shadow: 0 6px 20px rgba(2,93,184,0.12); border-color: #025db8; }
+.welcome-card-icon { font-size: 36px; margin-bottom: 0.75rem; }
+.welcome-card-title { font-family: 'League Spartan', sans-serif; font-size: 16px; font-weight: 700; color: #2e2e2e; margin-bottom: 6px; }
+.welcome-card-desc { font-size: 12px; color: #888; line-height: 1.5; direction: ltr; }
+@media (max-width: 500px) { .welcome-cards { grid-template-columns: 1fr; } }
+
+/* ── SHARED ── */
 .loading { text-align: center; padding: 3rem 1rem; color: #888; font-size: 14px; direction: ltr; }
 .spinner { display: inline-block; width: 22px; height: 22px; border: 2px solid #ddd; border-top-color: #025db8; border-radius: 50%; animation: spin 0.8s linear infinite; margin-bottom: 10px; }
 @keyframes spin { to { transform: rotate(360deg); } }
@@ -104,6 +140,9 @@ select.passage:focus { outline: none; border-color: #025db8; }
   .infos-grid { grid-template-columns: 1fr; }
   .students th:nth-child(3), .students td:nth-child(3) { display: none; }
   .app-header { padding: 0.85rem 1rem; }
+  .login-card { margin: 1.5rem auto; padding: 2rem 1.25rem; }
+  .tabs-bar { padding: 0 0.75rem; }
+  .tab-btn { padding: 10px 12px; font-size: 13px; }
 }
 </style>
 </head>
@@ -114,35 +153,42 @@ select.passage:focus { outline: none; border-color: #025db8; }
       <span>Oulpan</span>
       <span class="lavi">Lavi</span>
     </div>
-    <div class="header-right">
+    <div id="header-right" class="header-right">
       <div class="header-title">דוח סיום שנה</div>
       <div class="header-sub">Rapport annuel fin d'année • 5786</div>
     </div>
   </div>
+  <div id="tabs-bar" class="tabs-bar" style="display:none;">
+    <button class="tab-btn active" onclick="switchTab('sikkum')">📋 דוח סיום שנה</button>
+    <button class="tab-btn" onclick="switchTab('bakasha')">📝 בקשות לשנה הבאה</button>
+  </div>
   <div class="content">
     <div id="root"></div>
+    <div id="tabs-content" class="tabs-content" style="display:none;">
+      <div id="tab-sikkum" class="tab-panel active"></div>
+      <div id="tab-bakasha" class="tab-panel"></div>
+    </div>
   </div>
 </div>
-<script>
-const BASE_COURS    = 'appNbwmEyVQsXA25U';
-const BASE_PRESENCE = 'appkhAfrnk3fafBwM';
-const TABLE_TEACHERS = 'tbl6i9FU406js7Edw';
-const TABLE_CLASSES  = 'tblTs7XeOJbkEcSf1';
-const TABLE_STUDENTS = 'tblnFCt3Ne5oHwhlr';
-const TABLE_PRESENCE = 'tblVpk0mZAYBAuCGG';
-const TABLE_RAPPORTS = 'tblpXR4YXdAhqlCqA';
 
-const AIRTABLE_KEY = 'patQN9qTSmLV5aKkl.27894395be4f0d150d7d26f35598c9e9fefdef6ee976dbad3dfecb9464a602f8';
+<script>
+const BASE_COURS        = 'appNbwmEyVQsXA25U';
+const BASE_PRESENCE     = 'appkhAfrnk3fafBwM';
+const TABLE_TEACHERS    = 'tbl6i9FU406js7Edw';
+const TABLE_CLASSES     = 'tblTs7XeOJbkEcSf1';
+const TABLE_STUDENTS    = 'tblnFCt3Ne5oHwhlr';
+const TABLE_PRESENCE    = 'tblVpk0mZAYBAuCGG';
+const TABLE_RAPPORTS    = 'tblpXR4YXdAhqlCqA';
+const TABLE_BAKASHA     = 'tblB5HHBdDDQbn0Hc';
+const AIRTABLE_KEY      = 'patQN9qTSmLV5aKkl.27894395be4f0d150d7d26f35598c9e9fefdef6ee976dbad3dfecb9464a602f8';
 
 let sentClasses = {};
 let state = { teacher: null, classes: [], students: {}, presences: {} };
 
+// ── API ──
 async function api(base, table, params='', method='GET', body=null) {
   const url = `https://api.airtable.com/v0/${base}/${table}${params}`;
-  const opts = {
-    method: method || 'GET',
-    headers: { 'Authorization': 'Bearer ' + AIRTABLE_KEY, 'Content-Type': 'application/json' }
-  };
+  const opts = { method: method || 'GET', headers: { 'Authorization': 'Bearer ' + AIRTABLE_KEY, 'Content-Type': 'application/json' } };
   if (body) opts.body = JSON.stringify(body);
   const res = await fetch(url, opts);
   const data = await res.json();
@@ -162,11 +208,62 @@ async function getAll(base, table, params='') {
   return records;
 }
 
+// ── TABS ──
+function switchTab(name) {
+  document.querySelectorAll('.tab-btn').forEach((b, i) => {
+    const names = ['sikkum', 'bakasha'];
+    b.classList.toggle('active', names[i] === name);
+  });
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  document.getElementById('tab-' + name).classList.add('active');
+  if (name === 'bakasha') {
+    renderBakasha();
+  } else if (name === 'sikkum' && !state.classes.length) {
+    loadClasses('sikkum');
+  }
+}
+
+function showTabs() {
+  document.getElementById('root').style.display = 'none';
+  document.getElementById('tabs-bar').style.display = 'flex';
+  document.getElementById('tabs-content').style.display = 'block';
+}
+
+function hideTabs() {
+  document.getElementById('root').style.display = 'block';
+  document.getElementById('tabs-bar').style.display = 'none';
+  document.getElementById('tabs-content').style.display = 'none';
+}
+
+function setTab(name, html) { document.getElementById(`tab-${name}`).innerHTML = html; }
 function setRoot(html) { document.getElementById('root').innerHTML = html; }
 function loading(msg) { setRoot(`<div class="loading"><div class="spinner"></div><br>${msg}</div>`); }
 
-function init() { sentClasses = {}; renderLogin(); }
+// ── HEADER ──
+function renderHeaderUser(teacher) {
+  document.getElementById('header-right').innerHTML = `
+    <div style="display:flex;align-items:center;gap:10px;direction:ltr;">
+      <span style="color:rgba(255,255,255,0.9);font-size:13px;font-weight:500;">${teacher.name}</span>
+      <button class="btn-logout" onclick="logout()">התנתקות</button>
+    </div>`;
+}
 
+function renderHeaderDefault() {
+  document.getElementById('header-right').innerHTML = `
+    <div class="header-title">דוח סיום שנה</div>
+    <div class="header-sub">Rapport annuel fin d'année • 5786</div>`;
+}
+
+// ── INIT ──
+function init() {
+  sentClasses = {};
+  state = { teacher: null, classes: [], students: {}, presences: {} };
+  renderHeaderDefault();
+  hideTabs();
+  renderLogin();
+}
+
+// ── LOGIN EMAIL ──
 function renderLogin(err) {
   setRoot(`
     <div class="card login-card">
@@ -183,22 +280,62 @@ function renderLogin(err) {
   if (inp) inp.addEventListener('keydown', e => { if(e.key==='Enter') loginByEmail(); });
 }
 
+function logout() { init(); }
+
+function renderWelcome() {
+  hideTabs();
+  setRoot(`
+    <div class="welcome-screen">
+      <div class="welcome-name">שלום, ${state.teacher.name}! 👋</div>
+      <div class="welcome-sub">Que souhaitez-vous faire aujourd'hui ?</div>
+      <div class="welcome-cards">
+        <div class="welcome-card" onclick="openTab('sikkum')">
+          <div class="welcome-card-icon">📋</div>
+          <div class="welcome-card-title">דוח סיום שנה</div>
+          <div class="welcome-card-desc">Rapport de fin d'année — évaluations et bilan par classe</div>
+        </div>
+        <div class="welcome-card" onclick="openTab('bakasha')">
+          <div class="welcome-card-icon">📝</div>
+          <div class="welcome-card-title">בקשות לשנה הבאה</div>
+          <div class="welcome-card-desc">Vos préférences et demandes pour l'année 5787</div>
+        </div>
+      </div>
+    </div>
+  `);
+}
+
+async function openTab(tabName) {
+  if (tabName === 'bakasha') {
+    showTabs();
+    switchTab('bakasha');
+  } else if (!state.classes.length) {
+    await loadClasses(tabName);
+  } else {
+    showTabs();
+    switchTab(tabName);
+  }
+}
+
 async function loginByEmail() {
   const email = (document.getElementById('email-input')?.value || '').trim().toLowerCase();
   if (!email) return;
   loading('Vérification...');
   try {
-    const recs = await getAll(BASE_COURS, TABLE_TEACHERS, '');
+    const recs  = await getAll(BASE_COURS, TABLE_TEACHERS, '');
     const found = recs.find(r => (r.fields['Email'] || '').trim().toLowerCase() === email);
-    if (!found) { renderLogin('Adresse email non reconnue. Vérifiez l\'orthographe ou contactez l\'administration.'); return; }
-    const classIds = found.fields['Classes 5786'] || [];
-    state.teacher = { id: found.id, name: (found.fields['Name'] || '').trim(), email: found.fields['Email'] || '', classIds };
+    if (!found) {
+      renderLogin('Adresse email non reconnue. Vérifiez l\'orthographe ou contactez l\'administration.');
+      return;
+    }
+    state.teacher = { id: found.id, name: (found.fields['Name'] || '').trim(), email: found.fields['Email'] || '', classIds: found.fields['Classes 5786'] || [] };
     if (!state.teacher.classIds.length) { renderLogin('Aucune classe trouvée pour cet email.'); return; }
-    await loadClasses();
+    renderHeaderUser(state.teacher);
+    renderWelcome();
   } catch(e) { setRoot(`<div class="error-msg">Erreur : ${e.message}</div>`); }
 }
 
-async function loadClasses() {
+// ── CHARGEMENT ──
+async function loadClasses(targetTab) {
   loading('Chargement de vos classes...');
   try {
     state.classes = []; state.students = {};
@@ -206,13 +343,7 @@ async function loadClasses() {
       const cls = await api(BASE_COURS, TABLE_CLASSES, `/${cid}`);
       const f = cls.fields;
       if (!['Complete', 'In Progress'].includes(f['Status'])) continue;
-      state.classes.push({
-        id: cid,
-        num: f['Numéro de Classe'] || f['Name'] || cid,
-        chapitre: f['Chapitre en cours'] || '',
-        niveau: f['Niveau'] || '',
-        studentIds: f['Students'] || []
-      });
+      state.classes.push({ id: cid, num: f['Numéro de Classe'] || f['Name'] || cid, chapitre: f['Chapitre en cours'] || '', niveau: f['Niveau'] || '', studentIds: f['Students'] || [] });
     }
     const allStudentIds = [...new Set(state.classes.flatMap(c => c.studentIds))];
     for (let i = 0; i < allStudentIds.length; i += 10) {
@@ -223,38 +354,32 @@ async function loadClasses() {
     }
     loading('Chargement des présences...');
     state.presences = {};
-
-    // Pour chaque classe, on récupère les présences filtrées par numéro de classe
-    // et on indexe par clé "NomEleve__NumeroClasse"
     for (const cls of state.classes) {
       const formula = encodeURIComponent(`{Classe}="${cls.num}"`);
       const res = await getAll(BASE_PRESENCE, TABLE_PRESENCE, `?filterByFormula=${formula}`);
       for (const r of res) {
         const n = (r.fields['Name'] || '').trim();
-        if (n) {
-          const key = `${n}__${cls.num}`;
-          state.presences[key] = r.fields['Nombre de présences'] || 0;
-        }
+        if (n) state.presences[`${n}__${cls.num}`] = r.fields['Nombre de présences'] || 0;
       }
     }
-
-    renderForm();
+    // Afficher les onglets
+    showTabs();
+    const sikkumHtml = buildSikkumHtml();
+    setTab('sikkum', sikkumHtml);
+    setTab('bakasha', ''); // sera rendu au clic
+    switchTab(targetTab || 'sikkum');
   } catch(e) { setRoot(`<div class="error-msg">Erreur : ${e.message}</div>`); }
 }
 
-// ── ACCORDÉON : ouvre une classe, ferme les autres ──
+// ── ONGLET 1 : SIKKUM ──
 function toggleClass(classId) {
-  const blocks = document.querySelectorAll('.classe-block');
-  blocks.forEach(b => {
-    if (b.id === `block-${classId}`) {
-      b.classList.toggle('open');
-    } else {
-      b.classList.remove('open');
-    }
+  document.querySelectorAll('.classe-block').forEach(b => {
+    if (b.id === `block-${classId}`) b.classList.toggle('open');
+    else b.classList.remove('open');
   });
 }
 
-function renderForm() {
+function buildSikkumHtml() {
   const t = state.teacher;
   let html = `
     <div class="prof-header">
@@ -262,13 +387,11 @@ function renderForm() {
         <div class="prof-name">${t.name}</div>
         <div class="prof-meta">${state.classes.length} כיתה${state.classes.length!==1?'ות':''} • שנת 5786</div>
       </div>
-      <button class="btn-ghost" onclick="init()">← התנתקות</button>
     </div>`;
 
   state.classes.forEach((cls, idx) => {
     const isSent = sentClasses[cls.id] === 'sent';
     const isOpen = idx === 0;
-
     html += `
     <div class="classe-block${isSent?' sent':''}${isOpen?' open':''}" id="block-${cls.id}">
       <div class="classe-header" onclick="toggleClass('${cls.id}')">
@@ -283,7 +406,6 @@ function renderForm() {
         </div>
         <span class="chevron">▾</span>
       </div>
-
       <div class="classe-body">
         <div class="infos-classe">
           <div class="infos-grid">
@@ -312,21 +434,14 @@ function renderForm() {
             </tr></thead>
             <tbody>`;
 
-    const sortedStudentIds = [...cls.studentIds].sort((a, b) => {
-      const nameA = state.students[a] || a;
-      const nameB = state.students[b] || b;
-      const presA = state.presences[`${nameA}__${cls.num}`] ?? -1;
-      const presB = state.presences[`${nameB}__${cls.num}`] ?? -1;
-      return presB - presA;
-    });
+    const sortedStudentIds = [...cls.studentIds].sort((a, b) =>
+      (state.presences[`${state.students[b]||b}__${cls.num}`] ?? -1) - (state.presences[`${state.students[a]||a}__${cls.num}`] ?? -1)
+    );
 
     for (const sid of sortedStudentIds) {
       const name = state.students[sid] || sid;
-      const presKey = `${name}__${cls.num}`;
-      const pres = state.presences[presKey];
-      const presHtml = pres !== undefined
-        ? `<span class="badge-pres">${pres}</span>`
-        : `<span class="badge-pres badge-unknown">—</span>`;
+      const pres = state.presences[`${name}__${cls.num}`];
+      const presHtml = pres !== undefined ? `<span class="badge-pres">${pres}</span>` : `<span class="badge-pres badge-unknown">—</span>`;
       html += `<tr>
         <td class="student-name">${name}</td>
         <td style="text-align:center;">${presHtml}</td>
@@ -343,104 +458,165 @@ function renderForm() {
     html += `</tbody></table></div>
         <div class="class-submit-area">
           <div class="submit-class-note">${isSent ? 'Classe enregistrée dans Airtable ✓' : 'Enregistre uniquement cette classe'}</div>
-          <button
-            class="btn-submit-class${isSent?' done':''}"
-            id="btn-${cls.id}"
-            onclick="submitClass('${cls.id}')"
-            ${isSent?'disabled':''}
-          >${isSent ? '✓ נשלח' : '✉ שמירה ושליחה'}</button>
+          <button class="btn-submit-class${isSent?' done':''}" id="btn-${cls.id}" onclick="submitClass('${cls.id}')" ${isSent?'disabled':''}>${isSent ? '✓ נשלח' : '✉ שמירה ושליחה'}</button>
         </div>
       </div>
     </div>`;
   });
-
-  setRoot(html);
+  return html;
 }
 
 async function submitClass(classId) {
   const cls = state.classes.find(c => c.id === classId);
   if (!cls) return;
-
   const btn = document.getElementById(`btn-${classId}`);
-  btn.disabled = true;
-  btn.textContent = 'שומר...';
-
-  const now = new Date().toISOString();
+  btn.disabled = true; btn.textContent = 'שומר...';
+  const now       = new Date().toISOString();
   const perek     = document.getElementById(`perek-${classId}`)?.value;
   const contenu   = document.getElementById(`contenu-${classId}`)?.value || '';
   const remarques = document.getElementById(`remarques-${classId}`)?.value || '';
-
-  const records = cls.studentIds.map(sid => {
-    const name    = state.students[sid] || sid;
-    // ── CORRECTION : clé nom + numéro de classe ──
-    const presKey = `${name}__${cls.num}`;
-    const pres    = state.presences[presKey];
-    const evalVal = document.getElementById(`eval-${classId}-${sid}`)?.value || '';
-    const passage = document.getElementById(`passage-${classId}-${sid}`)?.value || '';
+  const records   = cls.studentIds.map(sid => {
+    const name = state.students[sid] || sid;
+    const pres = state.presences[`${name}__${cls.num}`];
     return { fields: {
       'fldv20CiFCcpI5D0a': name,
       'fld5pPY7sfAzWNFJB': cls.num,
       'fldUqnBJ4rcoXUZw1': state.teacher.name,
       'fldcnIaGnFqbmvgCk': typeof pres === 'number' ? pres : 0,
-      'fldBkPM3GLSEh9ocV': evalVal,
-      'fldsjADeAmUvt8zvO': passage || null,
+      'fldBkPM3GLSEh9ocV': document.getElementById(`eval-${classId}-${sid}`)?.value || '',
+      'fldsjADeAmUvt8zvO': document.getElementById(`passage-${classId}-${sid}`)?.value || null,
       'fldR4g4kg2q3t1BPr': perek ? parseInt(perek) : null,
       'fldMJlONdkB6SJANA': contenu,
       'fldD7fivLb4cV91Uc': remarques,
       'fldjrcq6Y3qfsICAi': now
     }};
   });
-
   try {
-    for (let i = 0; i < records.length; i += 10) {
-      await api(BASE_COURS, TABLE_RAPPORTS, '', 'POST', { records: records.slice(i, i + 10) });
-    }
-
+    for (let i = 0; i < records.length; i += 10) await api(BASE_COURS, TABLE_RAPPORTS, '', 'POST', { records: records.slice(i, i + 10) });
     sentClasses[classId] = 'sent';
-
     const block = document.getElementById(`block-${classId}`);
     if (block) {
-      block.classList.add('sent');
-      block.classList.remove('open');
+      block.classList.add('sent'); block.classList.remove('open');
       block.querySelector('.classe-header').style.background = '#1d8653';
       const tags = block.querySelector('.classe-tags');
-      if (tags && !tags.querySelector('.tag-sent')) {
-        tags.insertAdjacentHTML('beforeend', `<span class="tag tag-sent">✓ נשלח</span>`);
-      }
+      if (tags && !tags.querySelector('.tag-sent')) tags.insertAdjacentHTML('beforeend', `<span class="tag tag-sent">✓ נשלח</span>`);
       block.querySelectorAll('input, textarea, select').forEach(el => el.disabled = true);
-      btn.classList.add('done');
-      btn.textContent = '✓ נשלח';
-      btn.disabled = true;
+      btn.classList.add('done'); btn.textContent = '✓ נשלח'; btn.disabled = true;
       const note = block.querySelector('.submit-class-note');
       if (note) note.textContent = 'Classe enregistrée dans Airtable ✓';
     }
-
-    // Ouvrir automatiquement la prochaine classe non envoyée
     const nextCls = state.classes.find(c => !sentClasses[c.id]);
     if (nextCls) {
       document.querySelectorAll('.classe-block').forEach(b => b.classList.remove('open'));
       const nextBlock = document.getElementById(`block-${nextCls.id}`);
-      if (nextBlock) {
-        nextBlock.classList.add('open');
-        nextBlock.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      }
+      if (nextBlock) { nextBlock.classList.add('open'); nextBlock.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
     } else {
-      // Toutes envoyées
       const total = state.classes.reduce((acc, c) => acc + c.studentIds.length, 0);
-      setRoot(`<div class="success-screen">
+      setTab('sikkum', `<div class="success-screen">
         <div class="success-icon">✅</div>
         <h2>הדוח נשמר בהצלחה!</h2>
         <p>${total} תלמידים נשמרו ב-Airtable</p>
         <p style="margin-top:6px;">תודה רבה, ${state.teacher.name}!</p>
-        <button class="btn-ghost" style="margin-top:1.5rem;" onclick="init()">← חזור לדף הכניסה</button>
       </div>`);
     }
-
   } catch(e) {
-    btn.disabled = false;
-    btn.textContent = '✉ שמירה ושליחה';
-    document.getElementById(`block-${classId}`)
-      .insertAdjacentHTML('afterbegin', `<div class="error-msg" style="margin:0.75rem 1.25rem;">Erreur : ${e.message}</div>`);
+    btn.disabled = false; btn.textContent = '✉ שמירה ושליחה';
+    document.getElementById(`block-${classId}`)?.insertAdjacentHTML('afterbegin', `<div class="error-msg" style="margin:0.75rem 1.25rem;">Erreur : ${e.message}</div>`);
+  }
+}
+
+// ── ONGLET 2 : BAKASHA ──
+function renderBakasha() {
+  // Ne pas re-rendre si déjà soumis
+  const panel = document.getElementById('tab-bakasha');
+  if (panel.querySelector('.bakasha-success')) return;
+
+  panel.innerHTML = `
+    <div class="bakasha-card">
+      <div class="bakasha-title">בקשות לשנה הבאה</div>
+      <div class="bakasha-sub">Demandes pour l'année prochaine — vos préférences pour 5787</div>
+      <div id="bakasha-error"></div>
+      <div class="bakasha-fields">
+
+        <div class="bakasha-field">
+          <label class="bakasha-label">Teacher</label>
+          <div class="bakasha-teacher-row">
+            <span class="bakasha-teacher-lock">🔒</span>
+            <span class="bakasha-teacher-email">${state.teacher.email}</span>
+          </div>
+        </div>
+
+        <div class="bakasha-field">
+          <label class="bakasha-label">המשך שיעורים קיימים</label>
+          <div class="bakasha-hint">אילו כיתות היית רוצה להמשיך בשנה הבאה</div>
+          <textarea class="bakasha-input" id="bk-continue" rows="3" placeholder="..."></textarea>
+        </div>
+
+        <div class="bakasha-field">
+          <label class="bakasha-label">שיעורים שאינך רוצה להמשיך</label>
+          <div class="bakasha-hint">יש כיתות שתרצה/י להפסיק</div>
+          <textarea class="bakasha-input" id="bk-stop" rows="3" placeholder="..."></textarea>
+        </div>
+
+        <div class="bakasha-field">
+          <label class="bakasha-label">מספר הכיתות הכולל</label>
+          <div class="bakasha-hint">כמה כיתות בשבוע את/ה מעוניין/ת ללמד בסך הכל בשנה הבאה?</div>
+          <textarea class="bakasha-input" id="bk-total" rows="2" placeholder="..."></textarea>
+        </div>
+
+        <div class="bakasha-field">
+          <label class="bakasha-label">ימים מועדפים</label>
+          <div class="bakasha-hint">אילו ימים בשבוע מתאימים לך ללמד? ואילו שעות</div>
+          <textarea class="bakasha-input" id="bk-days-ok" rows="3" placeholder="..."></textarea>
+        </div>
+
+        <div class="bakasha-field">
+          <label class="bakasha-label">ימים שאינם מתאימים</label>
+          <div class="bakasha-hint">יש ימים שאינך זמין/ה או שאינך מעוניין/ת ללמד בהם? אנא ציין/י</div>
+          <textarea class="bakasha-input" id="bk-days-no" rows="3" placeholder="..."></textarea>
+        </div>
+
+        <div class="bakasha-field">
+          <label class="bakasha-label">כל מה שחשוב לך לשתף</label>
+          <textarea class="bakasha-input" id="bk-notes" rows="3" placeholder="..."></textarea>
+        </div>
+
+      </div>
+      <div class="bakasha-submit-area">
+        <div class="bakasha-note">הנתונים יישמרו ב-Airtable</div>
+        <button class="btn-submit-bakasha" id="btn-bakasha" onclick="submitBakasha()">✉ שליחה</button>
+      </div>
+    </div>`;
+}
+
+async function submitBakasha() {
+  const btn = document.getElementById('btn-bakasha');
+  btn.disabled = true; btn.textContent = 'שולח...';
+  const errDiv = document.getElementById('bakasha-error');
+  errDiv.innerHTML = '';
+
+  const fields = {
+    'Teacher':                       state.teacher.email,
+    'המשך שיעורים קיימים':          document.getElementById('bk-continue')?.value || '',
+    'שיעורים שאינך רוצה להמשיך':   document.getElementById('bk-stop')?.value || '',
+    'מספר הכיתות הכולל':            document.getElementById('bk-total')?.value || '',
+    'ימים מועדפים':                  document.getElementById('bk-days-ok')?.value || '',
+    'ימים שאינם מתאימים':           document.getElementById('bk-days-no')?.value || '',
+    'כל מה שחשוב לך לשתף':         document.getElementById('bk-notes')?.value || '',
+  };
+
+  try {
+    await api(BASE_COURS, TABLE_BAKASHA, '', 'POST', { records: [{ fields }] });
+    document.getElementById('tab-bakasha').innerHTML = `
+      <div class="bakasha-card bakasha-success">
+        <div class="success-icon">✅</div>
+        <h2>הבקשה נשלחה בהצלחה!</h2>
+        <p style="margin-top:8px;">תודה רבה, ${state.teacher.name}!</p>
+        <p style="margin-top:6px;color:#aaa;font-size:12px;">הנתונים נשמרו ב-Airtable</p>
+      </div>`;
+  } catch(e) {
+    btn.disabled = false; btn.textContent = '✉ שליחה';
+    errDiv.innerHTML = `<div class="error-msg">Erreur : ${e.message}</div>`;
   }
 }
 
