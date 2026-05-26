@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-<title>דוח סיום שנה — אולפן לביא</title>
+<title>Lavi's Teacher App</title>
 <link href="https://fonts.googleapis.com/css2?family=League+Spartan:wght@400;500;700&family=Poppins:wght@400;500&display=swap" rel="stylesheet" />
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -373,11 +373,11 @@ async function loadClasses(targetTab) {
 
 // ── ONGLET 1 : SIKKUM ──
 function toggleClass(classId) {
-  document.querySelectorAll('.classe-block').forEach(b => {
-    if (b.id === `block-${classId}`) b.classList.toggle('open');
-    else b.classList.remove('open');
-  });
+  const block = document.getElementById(`block-${classId}`);
+  if (block) block.classList.toggle('open');
 }
+
+
 
 function buildSikkumHtml() {
   const t = state.teacher;
@@ -507,7 +507,7 @@ async function submitClass(classId) {
     }
     const nextCls = state.classes.find(c => !sentClasses[c.id]);
     if (nextCls) {
-      document.querySelectorAll('.classe-block').forEach(b => b.classList.remove('open'));
+      // ouverture de la prochaine sans fermer les autres
       const nextBlock = document.getElementById(`block-${nextCls.id}`);
       if (nextBlock) { nextBlock.classList.add('open'); nextBlock.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
     } else {
@@ -527,9 +527,8 @@ async function submitClass(classId) {
 
 // ── ONGLET 2 : BAKASHA ──
 function renderBakasha() {
-  // Ne pas re-rendre si déjà soumis
   const panel = document.getElementById('tab-bakasha');
-  if (panel.querySelector('.bakasha-success')) return;
+  if (panel.innerHTML.trim() !== '' && !panel.querySelector('.bakasha-success')) return;
 
   panel.innerHTML = `
     <div class="bakasha-card">
@@ -589,6 +588,11 @@ function renderBakasha() {
     </div>`;
 }
 
+function editBakasha() {
+  document.getElementById('tab-bakasha').innerHTML = '';
+  renderBakasha();
+}
+
 async function submitBakasha() {
   const btn = document.getElementById('btn-bakasha');
   btn.disabled = true; btn.textContent = 'שולח...';
@@ -613,6 +617,7 @@ async function submitBakasha() {
         <h2>הבקשה נשלחה בהצלחה!</h2>
         <p style="margin-top:8px;">תודה רבה, ${state.teacher.name}!</p>
         <p style="margin-top:6px;color:#aaa;font-size:12px;">הנתונים נשמרו ב-Airtable</p>
+        <button class="btn-ghost" style="margin-top:1.5rem;" onclick="editBakasha()">✏️ Modifier ma réponse</button>
       </div>`;
   } catch(e) {
     btn.disabled = false; btn.textContent = '✉ שליחה';
