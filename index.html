@@ -215,8 +215,12 @@ function switchTab(name) {
     b.classList.toggle('active', names[i] === name);
   });
   document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
-  document.getElementById(`tab-${name}`).classList.add('active');
-  if (name === 'bakasha') renderBakasha();
+  document.getElementById('tab-' + name).classList.add('active');
+  if (name === 'bakasha') {
+    renderBakasha();
+  } else if (name === 'sikkum' && !state.classes.length) {
+    loadClasses('sikkum');
+  }
 }
 
 function showTabs() {
