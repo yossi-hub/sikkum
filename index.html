@@ -329,6 +329,8 @@ async function loginByEmail() {
     }
     state.teacher = { id: found.id, name: (found.fields['Name'] || '').trim(), email: found.fields['Email'] || '', classIds: found.fields['Classes 5786'] || [] };
     if (!state.teacher.classIds.length) { renderLogin('Aucune classe trouvée pour cet email.'); return; }
+    // ── NOUVEAU : charger les classes déjà envoyées depuis localStorage ──
+    sentClasses = JSON.parse(localStorage.getItem('sentClasses_' + state.teacher.email) || '{}');
     renderHeaderUser(state.teacher);
     renderWelcome();
   } catch(e) { setRoot(`<div class="error-msg">Erreur : ${e.message}</div>`); }
@@ -377,8 +379,6 @@ function toggleClass(classId) {
   if (block) block.classList.toggle('open');
 }
 
-
-
 function buildSikkumHtml() {
   const t = state.teacher;
   let html = `
@@ -391,7 +391,9 @@ function buildSikkumHtml() {
 
   state.classes.forEach((cls, idx) => {
     const isSent = sentClasses[cls.id] === 'sent';
-    const isOpen = idx === 0;
+    // Ouvrir la première classe non encore envoyée, ou la première si toutes envoyées
+    const firstUnsent = state.classes.find(c => sentClasses[c.id] !== 'sent');
+    const isOpen = firstUnsent ? cls.id === firstUnsent.id : idx === 0;
     html += `
     <div class="classe-block${isSent?' sent':''}${isOpen?' open':''}" id="block-${cls.id}">
       <div class="classe-header" onclick="toggleClass('${cls.id}')">
@@ -494,6 +496,8 @@ async function submitClass(classId) {
   try {
     for (let i = 0; i < records.length; i += 10) await api(BASE_COURS, TABLE_RAPPORTS, '', 'POST', { records: records.slice(i, i + 10) });
     sentClasses[classId] = 'sent';
+    // ── NOUVEAU : sauvegarder dans localStorage ──
+    localStorage.setItem('sentClasses_' + state.teacher.email, JSON.stringify(sentClasses));
     const block = document.getElementById(`block-${classId}`);
     if (block) {
       block.classList.add('sent'); block.classList.remove('open');
@@ -507,7 +511,6 @@ async function submitClass(classId) {
     }
     const nextCls = state.classes.find(c => !sentClasses[c.id]);
     if (nextCls) {
-      // ouverture de la prochaine sans fermer les autres
       const nextBlock = document.getElementById(`block-${nextCls.id}`);
       if (nextBlock) { nextBlock.classList.add('open'); nextBlock.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
     } else {
