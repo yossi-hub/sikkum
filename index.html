@@ -367,7 +367,7 @@ async function loadClasses(targetTab) {
     loading('Vérification des rapports existants...');
     sentClasses = {};
     const teacherName = state.teacher.name;
-    const formula = encodeURIComponent(`{Enseignant}="${teacherName}"`);
+    const formula = encodeURIComponent(`{Prof}="${teacherName}"`);
     const rapports = await getAll(BASE_COURS, TABLE_RAPPORTS, `?filterByFormula=${formula}&fields[]=Classe`);
     const sentNums = new Set(rapports.map(r => String(r.fields['Classe'] || '').trim()).filter(Boolean));
     for (const cls of state.classes) {
