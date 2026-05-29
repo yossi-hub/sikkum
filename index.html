@@ -329,8 +329,6 @@ async function loginByEmail() {
     }
     state.teacher = { id: found.id, name: (found.fields['Name'] || '').trim(), email: found.fields['Email'] || '', classIds: found.fields['Classes 5786'] || [] };
     if (!state.teacher.classIds.length) { renderLogin('Aucune classe trouvée pour cet email.'); return; }
-    // ── NOUVEAU : charger les classes déjà envoyées depuis localStorage ──
-    sentClasses = JSON.parse(localStorage.getItem('sentClasses_' + state.teacher.email) || '{}');
     renderHeaderUser(state.teacher);
     renderWelcome();
   } catch(e) { setRoot(`<div class="error-msg">Erreur : ${e.message}</div>`); }
@@ -364,11 +362,23 @@ async function loadClasses(targetTab) {
         if (n) state.presences[`${n}__${cls.num}`] = r.fields['Nombre de présences'] || 0;
       }
     }
+
+    // ── NOUVEAU : vérifier dans TABLE_RAPPORTS quelles classes ont déjà été envoyées ──
+    loading('Vérification des rapports existants...');
+    sentClasses = {};
+    const teacherName = state.teacher.name;
+    const formula = encodeURIComponent(`{Enseignant}="${teacherName}"`);
+    const rapports = await getAll(BASE_COURS, TABLE_RAPPORTS, `?filterByFormula=${formula}&fields[]=Classe`);
+    const sentNums = new Set(rapports.map(r => String(r.fields['Classe'] || '').trim()).filter(Boolean));
+    for (const cls of state.classes) {
+      if (sentNums.has(String(cls.num))) sentClasses[cls.id] = 'sent';
+    }
+
     // Afficher les onglets
     showTabs();
     const sikkumHtml = buildSikkumHtml();
     setTab('sikkum', sikkumHtml);
-    setTab('bakasha', ''); // sera rendu au clic
+    setTab('bakasha', '');
     switchTab(targetTab || 'sikkum');
   } catch(e) { setRoot(`<div class="error-msg">Erreur : ${e.message}</div>`); }
 }
@@ -391,7 +401,6 @@ function buildSikkumHtml() {
 
   state.classes.forEach((cls, idx) => {
     const isSent = sentClasses[cls.id] === 'sent';
-    // Ouvrir la première classe non encore envoyée, ou la première si toutes envoyées
     const firstUnsent = state.classes.find(c => sentClasses[c.id] !== 'sent');
     const isOpen = firstUnsent ? cls.id === firstUnsent.id : idx === 0;
     html += `
@@ -496,8 +505,6 @@ async function submitClass(classId) {
   try {
     for (let i = 0; i < records.length; i += 10) await api(BASE_COURS, TABLE_RAPPORTS, '', 'POST', { records: records.slice(i, i + 10) });
     sentClasses[classId] = 'sent';
-    // ── NOUVEAU : sauvegarder dans localStorage ──
-    localStorage.setItem('sentClasses_' + state.teacher.email, JSON.stringify(sentClasses));
     const block = document.getElementById(`block-${classId}`);
     if (block) {
       block.classList.add('sent'); block.classList.remove('open');
