@@ -362,11 +362,23 @@ async function loadClasses(targetTab) {
         if (n) state.presences[`${n}__${cls.num}`] = r.fields['Nombre de présences'] || 0;
       }
     }
+
+    // ── NOUVEAU : vérifier dans TABLE_RAPPORTS quelles classes ont déjà été envoyées ──
+    loading('Vérification des rapports existants...');
+    sentClasses = {};
+    const teacherName = state.teacher.name;
+    const formula = encodeURIComponent(`{Prof}="${teacherName}"`);
+    const rapports = await getAll(BASE_COURS, TABLE_RAPPORTS, `?filterByFormula=${formula}&fields[]=Classe`);
+    const sentNums = new Set(rapports.map(r => String(r.fields['Classe'] || '').trim()).filter(Boolean));
+    for (const cls of state.classes) {
+      if (sentNums.has(String(cls.num))) sentClasses[cls.id] = 'sent';
+    }
+
     // Afficher les onglets
     showTabs();
     const sikkumHtml = buildSikkumHtml();
     setTab('sikkum', sikkumHtml);
-    setTab('bakasha', ''); // sera rendu au clic
+    setTab('bakasha', '');
     switchTab(targetTab || 'sikkum');
   } catch(e) { setRoot(`<div class="error-msg">Erreur : ${e.message}</div>`); }
 }
@@ -376,8 +388,6 @@ function toggleClass(classId) {
   const block = document.getElementById(`block-${classId}`);
   if (block) block.classList.toggle('open');
 }
-
-
 
 function buildSikkumHtml() {
   const t = state.teacher;
@@ -391,7 +401,8 @@ function buildSikkumHtml() {
 
   state.classes.forEach((cls, idx) => {
     const isSent = sentClasses[cls.id] === 'sent';
-    const isOpen = idx === 0;
+    const firstUnsent = state.classes.find(c => sentClasses[c.id] !== 'sent');
+    const isOpen = firstUnsent ? cls.id === firstUnsent.id : idx === 0;
     html += `
     <div class="classe-block${isSent?' sent':''}${isOpen?' open':''}" id="block-${cls.id}">
       <div class="classe-header" onclick="toggleClass('${cls.id}')">
@@ -507,7 +518,6 @@ async function submitClass(classId) {
     }
     const nextCls = state.classes.find(c => !sentClasses[c.id]);
     if (nextCls) {
-      // ouverture de la prochaine sans fermer les autres
       const nextBlock = document.getElementById(`block-${nextCls.id}`);
       if (nextBlock) { nextBlock.classList.add('open'); nextBlock.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
     } else {
