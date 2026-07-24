@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Lavi's Teacher App</title>
 <link href="https://fonts.googleapis.com/css2?family=League+Spartan:wght@400;500;700&family=Poppins:wght@400;500&display=swap" rel="stylesheet" />
+<script src="https://accounts.google.com/gsi/client"></script>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body { font-family: 'Poppins', -apple-system, sans-serif; background: #f0ede8; color: #2e2e2e; direction: rtl; min-height: 100vh; }
@@ -182,6 +183,10 @@ const TABLE_RAPPORTS    = 'tblpXR4YXdAhqlCqA';
 const TABLE_BAKASHA     = 'tblB5HHBdDDQbn0Hc';
 const AIRTABLE_KEY      = 'patQN9qTSmLV5aKkl.27894395be4f0d150d7d26f35598c9e9fefdef6ee976dbad3dfecb9464a602f8';
 
+// ── GOOGLE AUTH ──
+const GOOGLE_CLIENT_ID  = '208792012375-tah7nn3utsgsnbgs9fv2ah5mr17qcr6n.apps.googleusercontent.com';
+const ALLOWED_DOMAIN    = 'oulpanlavi.com';
+
 let sentClasses = {};
 let state = { teacher: null, classes: [], students: {}, presences: {} };
 
@@ -263,24 +268,78 @@ function init() {
   renderLogin();
 }
 
-// ── LOGIN EMAIL ──
+// ── LOGIN GOOGLE ──
 function renderLogin(err) {
   setRoot(`
     <div class="card login-card">
       <div class="login-title">שלום! 👋</div>
-      <div class="login-sub">Entrez votre adresse email pour accéder à vos classes</div>
+      <div class="login-sub">התחברו עם חשבון הגוגל שלכם (oulpanlavi.com)</div>
       ${err ? `<div class="error-msg">${err}</div>` : ''}
-      <div class="email-row">
-        <input class="email-input" type="email" id="email-input" placeholder="prenom@oulpanlavi.com" />
-        <button class="btn-blue" onclick="loginByEmail()">המשך →</button>
-      </div>
+      <div id="google-signin-btn" style="display:flex;justify-content:center;margin-top:0.5rem;"></div>
     </div>
   `);
-  const inp = document.getElementById('email-input');
-  if (inp) inp.addEventListener('keydown', e => { if(e.key==='Enter') loginByEmail(); });
+  initGoogleSignIn();
 }
 
-function logout() { init(); }
+function initGoogleSignIn() {
+  if (!window.google || !window.google.accounts || !window.google.accounts.id) {
+    // Le script Google n'est pas encore chargé, on réessaie un peu plus tard
+    setTimeout(initGoogleSignIn, 200);
+    return;
+  }
+  google.accounts.id.initialize({
+    client_id: GOOGLE_CLIENT_ID,
+    callback: handleGoogleCredential
+  });
+  const btnContainer = document.getElementById('google-signin-btn');
+  if (btnContainer) {
+    google.accounts.id.renderButton(btnContainer, {
+      theme: 'filled_blue',
+      size: 'large',
+      shape: 'pill',
+      text: 'signin_with',
+      locale: 'he'
+    });
+  }
+}
+
+function decodeJwt(token) {
+  const base64Url = token.split('.')[1];
+  const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+  const jsonPayload = decodeURIComponent(
+    atob(base64).split('').map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)).join('')
+  );
+  return JSON.parse(jsonPayload);
+}
+
+async function handleGoogleCredential(response) {
+  try {
+    const payload = decodeJwt(response.credential);
+    const email = (payload.email || '').trim().toLowerCase();
+
+    if (payload.email_verified === false) {
+      renderLogin('חשבון הגוגל שלך אינו מאומת.');
+      return;
+    }
+
+    const domain = email.split('@')[1] || '';
+    if (domain !== ALLOWED_DOMAIN) {
+      renderLogin(`יש להתחבר עם חשבון @${ALLOWED_DOMAIN} בלבד.`);
+      return;
+    }
+
+    await loginByEmail(email);
+  } catch (e) {
+    renderLogin('שגיאה בהתחברות: ' + e.message);
+  }
+}
+
+function logout() {
+  if (window.google && google.accounts && google.accounts.id) {
+    google.accounts.id.disableAutoSelect();
+  }
+  init();
+}
 
 function renderWelcome() {
   hideTabs();
@@ -316,19 +375,19 @@ async function openTab(tabName) {
   }
 }
 
-async function loginByEmail() {
-  const email = (document.getElementById('email-input')?.value || '').trim().toLowerCase();
+async function loginByEmail(emailArg) {
+  const email = (emailArg || '').trim().toLowerCase();
   if (!email) return;
-  loading('Vérification...');
+  loading('מתחבר...');
   try {
     const recs  = await getAll(BASE_COURS, TABLE_TEACHERS, '');
     const found = recs.find(r => (r.fields['Email'] || '').trim().toLowerCase() === email);
     if (!found) {
-      renderLogin('Adresse email non reconnue. Vérifiez l\'orthographe ou contactez l\'administration.');
+      renderLogin('החשבון שלך מזוהה אך אינו רשום כמורה במערכת. אנא פנה/י להנהלה.');
       return;
     }
     state.teacher = { id: found.id, name: (found.fields['Name'] || '').trim(), email: found.fields['Email'] || '', classIds: found.fields['Classes 5786'] || [] };
-    if (!state.teacher.classIds.length) { renderLogin('Aucune classe trouvée pour cet email.'); return; }
+    if (!state.teacher.classIds.length) { renderLogin('לא נמצאו כיתות עבור משתמש זה.'); return; }
     renderHeaderUser(state.teacher);
     renderWelcome();
   } catch(e) { setRoot(`<div class="error-msg">Erreur : ${e.message}</div>`); }
@@ -363,7 +422,7 @@ async function loadClasses(targetTab) {
       }
     }
 
-    // ── NOUVEAU : vérifier dans TABLE_RAPPORTS quelles classes ont déjà été envoyées ──
+    // ── vérifier dans TABLE_RAPPORTS quelles classes ont déjà été envoyées ──
     loading('Vérification des rapports existants...');
     sentClasses = {};
     const teacherName = state.teacher.name;
