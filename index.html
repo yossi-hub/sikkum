@@ -60,6 +60,8 @@ body { font-family: 'Poppins', -apple-system, sans-serif; background: #f0ede8; c
 .classe-tags { display: flex; gap: 6px; flex-wrap: wrap; align-items: center; }
 .tag { display: inline-block; background: rgba(255,255,255,0.2); color: #fff; border-radius: 20px; font-size: 11px; padding: 2px 10px; }
 .tag-sent { background: rgba(255,255,255,0.35); font-weight: 700; }
+.tag-edit { display: inline-flex; align-items: center; justify-content: center; width: 22px; height: 22px; border-radius: 50%; background: rgba(255,255,255,0.25); color: #fff; font-size: 12px; cursor: pointer; transition: background .15s; }
+.tag-edit:hover { background: rgba(255,255,255,0.45); }
 .chevron { color: rgba(255,255,255,0.8); font-size: 18px; transition: transform .25s; flex-shrink: 0; }
 .classe-block.open .chevron { transform: rotate(180deg); }
 .classe-body { display: none; }
@@ -188,7 +190,7 @@ const GOOGLE_CLIENT_ID  = '208792012375-tah7nn3utsgsnbgs9fv2ah5mr17qcr6n.apps.go
 const ALLOWED_DOMAIN    = 'oulpanlavi.com';
 
 let sentClasses = {};
-let state = { teacher: null, classes: [], students: {}, presences: {} };
+let state = { teacher: null, classes: [], students: {}, presences: {}, rapportRecords: {} };
 
 // ── API ──
 async function api(base, table, params='', method='GET', body=null) {
@@ -262,7 +264,7 @@ function renderHeaderDefault() {
 // ── INIT ──
 function init() {
   sentClasses = {};
-  state = { teacher: null, classes: [], students: {}, presences: {} };
+  state = { teacher: null, classes: [], students: {}, presences: {}, rapportRecords: {} };
   renderHeaderDefault();
   hideTabs();
   renderLogin();
@@ -422,23 +424,28 @@ async function loadClasses(targetTab) {
       }
     }
 
-    // ── vérifier dans TABLE_RAPPORTS quelles classes ont déjà été envoyées ──
+    // ── vérifier dans TABLE_RAPPORTS quelles classes ont déjà été envoyées, et garder les enregistrements complets (pour édition ultérieure) ──
     loading('Vérification des rapports existants...');
     sentClasses = {};
+    state.rapportRecords = {};
     const teacherName = state.teacher.name;
     const formula = encodeURIComponent(`{Prof}="${teacherName}"`);
-    const rapports = await getAll(BASE_COURS, TABLE_RAPPORTS, `?filterByFormula=${formula}&fields[]=Classe`);
-    const sentNums = new Set(rapports.map(r => String(r.fields['Classe'] || '').trim()).filter(Boolean));
+    // returnFieldsByFieldId permet de retrouver les champs par leur ID (mêmes clés que celles utilisées à l'écriture)
+    const rapports = await getAll(BASE_COURS, TABLE_RAPPORTS, `?filterByFormula=${formula}&returnFieldsByFieldId=true`);
     for (const cls of state.classes) {
-      if (sentNums.has(String(cls.num))) sentClasses[cls.id] = 'sent';
+      const recs = rapports.filter(r => String(r.fields['fld5pPY7sfAzWNFJB'] || '').trim() === String(cls.num).trim());
+      if (recs.length) {
+        sentClasses[cls.id] = 'sent';
+        state.rapportRecords[cls.id] = recs;
+      }
     }
 
-    // Afficher les onglets
+    // Afficher les onglets et remplir le contenu de l'onglet classes,
+    // SANS forcer le retour sur cet onglet ni toucher à l'onglet bakashot :
+    // si l'utilisateur a entre-temps navigué ailleurs pendant le chargement,
+    // on ne veut pas l'y ramener de force.
     showTabs();
-    const sikkumHtml = buildSikkumHtml();
-    setTab('sikkum', sikkumHtml);
-    setTab('bakasha', '');
-    switchTab(targetTab || 'sikkum');
+    renderSikkumTab();
   } catch(e) { setRoot(`<div class="error-msg">Erreur : ${e.message}</div>`); }
 }
 
@@ -446,6 +453,20 @@ async function loadClasses(targetTab) {
 function toggleClass(classId) {
   const block = document.getElementById(`block-${classId}`);
   if (block) block.classList.toggle('open');
+}
+
+function renderSikkumTab() {
+  const allSent = state.classes.length > 0 && state.classes.every(c => sentClasses[c.id] === 'sent');
+  let banner = '';
+  if (allSent) {
+    banner = `
+    <div class="success-screen" style="margin-bottom:1.25rem;padding:2rem;">
+      <div class="success-icon">✅</div>
+      <h2>הדוח נשמר בהצלחה!</h2>
+      <p>כל הכיתות נשלחו. ניתן עדיין לערוך כל כיתה בלחיצה על ✎</p>
+    </div>`;
+  }
+  setTab('sikkum', banner + buildSikkumHtml());
 }
 
 function buildSikkumHtml() {
@@ -461,7 +482,7 @@ function buildSikkumHtml() {
   state.classes.forEach((cls, idx) => {
     const isSent = sentClasses[cls.id] === 'sent';
     const firstUnsent = state.classes.find(c => sentClasses[c.id] !== 'sent');
-    const isOpen = firstUnsent ? cls.id === firstUnsent.id : idx === 0;
+    const isOpen = firstUnsent ? cls.id === firstUnsent.id : false;
     html += `
     <div class="classe-block${isSent?' sent':''}${isOpen?' open':''}" id="block-${cls.id}">
       <div class="classe-header" onclick="toggleClass('${cls.id}')">
@@ -471,7 +492,7 @@ function buildSikkumHtml() {
             ${cls.niveau ? `<span class="tag">${cls.niveau}</span>` : ''}
             <span class="tag">${cls.studentIds.length} תלמידים</span>
             ${cls.chapitre ? `<span class="tag">פרק ${cls.chapitre}</span>` : ''}
-            ${isSent ? `<span class="tag tag-sent">✓ נשלח</span>` : ''}
+            ${isSent ? `<span class="tag tag-sent">✓ נשלח</span><span class="tag-edit" title="עריכת הדוח" onclick="event.stopPropagation(); enableEditClass('${cls.id}')">✎</span>` : ''}
           </div>
         </div>
         <span class="chevron">▾</span>
@@ -536,19 +557,78 @@ function buildSikkumHtml() {
   return html;
 }
 
+// ── Passage en mode édition d'une classe déjà envoyée ──
+function enableEditClass(classId) {
+  const cls = state.classes.find(c => c.id === classId);
+  const block = document.getElementById(`block-${classId}`);
+  if (!cls || !block) return;
+
+  block.classList.add('open');
+
+  // Réactiver tous les champs de la classe
+  block.querySelectorAll('input, textarea, select').forEach(el => el.disabled = false);
+
+  // Pré-remplir avec les données existantes venant d'Airtable
+  const recs = state.rapportRecords[classId] || [];
+  if (recs.length) {
+    const first = recs[0].fields;
+    const perekEl = document.getElementById(`perek-${classId}`);
+    if (perekEl && first['fldR4g4kg2q3t1BPr'] != null) perekEl.value = first['fldR4g4kg2q3t1BPr'];
+    const contenuEl = document.getElementById(`contenu-${classId}`);
+    if (contenuEl) contenuEl.value = first['fldMJlONdkB6SJANA'] || '';
+    const remarquesEl = document.getElementById(`remarques-${classId}`);
+    if (remarquesEl) remarquesEl.value = first['fldD7fivLb4cV91Uc'] || '';
+  }
+  for (const r of recs) {
+    const name = (r.fields['fldv20CiFCcpI5D0a'] || '').trim();
+    const sid = cls.studentIds.find(id => (state.students[id] || '').trim() === name);
+    if (!sid) continue;
+    const evalEl = document.getElementById(`eval-${classId}-${sid}`);
+    if (evalEl) evalEl.value = r.fields['fldBkPM3GLSEh9ocV'] || '';
+    const passEl = document.getElementById(`passage-${classId}-${sid}`);
+    if (passEl) passEl.value = r.fields['fldsjADeAmUvt8zvO'] || '';
+  }
+
+  // Basculer le bouton en mode "mise à jour"
+  const btn = document.getElementById(`btn-${classId}`);
+  if (btn) {
+    btn.disabled = false;
+    btn.classList.remove('done');
+    btn.textContent = '✎ עדכון ושמירה';
+  }
+  const note = block.querySelector('.submit-class-note');
+  if (note) note.textContent = 'מצב עריכה — השינויים יעדכנו את הדוח הקיים ב-Airtable';
+
+  block.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
 async function submitClass(classId) {
   const cls = state.classes.find(c => c.id === classId);
   if (!cls) return;
+  const isEditing = !!(state.rapportRecords[classId] && state.rapportRecords[classId].length);
   const btn = document.getElementById(`btn-${classId}`);
-  btn.disabled = true; btn.textContent = 'שומר...';
+  if (btn) { btn.disabled = true; btn.textContent = isEditing ? 'מעדכן...' : 'שומר...'; }
+
   const now       = new Date().toISOString();
   const perek     = document.getElementById(`perek-${classId}`)?.value;
   const contenu   = document.getElementById(`contenu-${classId}`)?.value || '';
   const remarques = document.getElementById(`remarques-${classId}`)?.value || '';
-  const records   = cls.studentIds.map(sid => {
+
+  // enregistrements existants pour cette classe, indexés par nom d'élève
+  const existingByName = {};
+  if (isEditing) {
+    for (const r of state.rapportRecords[classId]) {
+      const n = (r.fields['fldv20CiFCcpI5D0a'] || '').trim();
+      if (n) existingByName[n] = r.id;
+    }
+  }
+
+  const toCreate = [];
+  const toUpdate = [];
+  for (const sid of cls.studentIds) {
     const name = state.students[sid] || sid;
     const pres = state.presences[`${name}__${cls.num}`];
-    return { fields: {
+    const fields = {
       'fldv20CiFCcpI5D0a': name,
       'fld5pPY7sfAzWNFJB': cls.num,
       'fldUqnBJ4rcoXUZw1': state.teacher.name,
@@ -559,37 +639,39 @@ async function submitClass(classId) {
       'fldMJlONdkB6SJANA': contenu,
       'fldD7fivLb4cV91Uc': remarques,
       'fldjrcq6Y3qfsICAi': now
-    }};
-  });
+    };
+    const existingId = existingByName[name];
+    if (existingId) toUpdate.push({ id: existingId, fields });
+    else toCreate.push({ fields });
+  }
+
   try {
-    for (let i = 0; i < records.length; i += 10) await api(BASE_COURS, TABLE_RAPPORTS, '', 'POST', { records: records.slice(i, i + 10) });
-    sentClasses[classId] = 'sent';
-    const block = document.getElementById(`block-${classId}`);
-    if (block) {
-      block.classList.add('sent'); block.classList.remove('open');
-      block.querySelector('.classe-header').style.background = '#1d8653';
-      const tags = block.querySelector('.classe-tags');
-      if (tags && !tags.querySelector('.tag-sent')) tags.insertAdjacentHTML('beforeend', `<span class="tag tag-sent">✓ נשלח</span>`);
-      block.querySelectorAll('input, textarea, select').forEach(el => el.disabled = true);
-      btn.classList.add('done'); btn.textContent = '✓ נשלח'; btn.disabled = true;
-      const note = block.querySelector('.submit-class-note');
-      if (note) note.textContent = 'Classe enregistrée dans Airtable ✓';
+    const savedRecords = [];
+    // Mise à jour des enregistrements existants (PATCH)
+    for (let i = 0; i < toUpdate.length; i += 10) {
+      const res = await api(BASE_COURS, TABLE_RAPPORTS, '', 'PATCH', { records: toUpdate.slice(i, i + 10), returnFieldsByFieldId: true });
+      savedRecords.push(...(res.records || []));
     }
+    // Création des nouveaux enregistrements (POST) — ex: élèves ajoutés depuis le dernier envoi
+    for (let i = 0; i < toCreate.length; i += 10) {
+      const res = await api(BASE_COURS, TABLE_RAPPORTS, '', 'POST', { records: toCreate.slice(i, i + 10), returnFieldsByFieldId: true });
+      savedRecords.push(...(res.records || []));
+    }
+
+    sentClasses[classId] = 'sent';
+    state.rapportRecords[classId] = savedRecords;
+
+    renderSikkumTab();
+
     const nextCls = state.classes.find(c => !sentClasses[c.id]);
     if (nextCls) {
       const nextBlock = document.getElementById(`block-${nextCls.id}`);
-      if (nextBlock) { nextBlock.classList.add('open'); nextBlock.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
+      if (nextBlock) nextBlock.scrollIntoView({ behavior: 'smooth', block: 'start' });
     } else {
-      const total = state.classes.reduce((acc, c) => acc + c.studentIds.length, 0);
-      setTab('sikkum', `<div class="success-screen">
-        <div class="success-icon">✅</div>
-        <h2>הדוח נשמר בהצלחה!</h2>
-        <p>${total} תלמידים נשמרו ב-Airtable</p>
-        <p style="margin-top:6px;">תודה רבה, ${state.teacher.name}!</p>
-      </div>`);
+      document.getElementById('tab-sikkum')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
   } catch(e) {
-    btn.disabled = false; btn.textContent = '✉ שמירה ושליחה';
+    if (btn) { btn.disabled = false; btn.textContent = isEditing ? '✎ עדכון ושמירה' : '✉ שמירה ושליחה'; }
     document.getElementById(`block-${classId}`)?.insertAdjacentHTML('afterbegin', `<div class="error-msg" style="margin:0.75rem 1.25rem;">Erreur : ${e.message}</div>`);
   }
 }
