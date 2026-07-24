@@ -440,11 +440,12 @@ async function loadClasses(targetTab) {
       }
     }
 
-    // Afficher les onglets
+    // Afficher les onglets et remplir le contenu de l'onglet classes,
+    // SANS forcer le retour sur cet onglet ni toucher à l'onglet bakashot :
+    // si l'utilisateur a entre-temps navigué ailleurs pendant le chargement,
+    // on ne veut pas l'y ramener de force.
     showTabs();
     renderSikkumTab();
-    setTab('bakasha', '');
-    switchTab(targetTab || 'sikkum');
   } catch(e) { setRoot(`<div class="error-msg">Erreur : ${e.message}</div>`); }
 }
 
