@@ -5,9 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Lavi's Teacher App</title>
 <link href="https://fonts.googleapis.com/css2?family=League+Spartan:wght@400;500;700&family=Poppins:wght@400;500&display=swap" rel="stylesheet" />
-<!-- MODE DEV : connexion Google désactivée. Pour la réactiver, décommenter la ligne ci-dessous
-     et voir le bloc "GOOGLE AUTH" dans le script en bas de page. -->
-<!-- <script src="https://accounts.google.com/gsi/client"></script> -->
+<script src="https://accounts.google.com/gsi/client"></script>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body { font-family: 'Poppins', -apple-system, sans-serif; background: #f0ede8; color: #2e2e2e; direction: rtl; min-height: 100vh; }
@@ -306,44 +304,8 @@ function init() {
   renderLogin();
 }
 
-// ══════════════════════════════════════════════════════════════════
-// LOGIN — MODE DEV : saisie libre de l'email, sans Google.
-// Permet de se connecter au compte de n'importe quel prof pour tester.
-// ⚠️ À REMPLACER par le bloc "LOGIN GOOGLE" (plus bas, en commentaire)
-//    avant la mise en production.
-// ══════════════════════════════════════════════════════════════════
-function renderLogin(err) {
-  setRoot(`
-    <div class="card login-card">
-      <div class="login-title">שלום! 👋</div>
-      <div class="login-sub">Mode test — entrez l'email d'un professeur</div>
-      <div class="dev-banner">🔧 MODE DÉVELOPPEMENT — connexion sans Google</div>
-      ${err ? `<div class="error-msg">${err}</div>` : ''}
-      <div class="email-row">
-        <input type="email" class="email-input" id="login-email" placeholder="prenom@oulpanlavi.com"
-               onkeydown="if(event.key==='Enter') doLogin()" autocomplete="off" />
-        <button class="btn-blue" onclick="doLogin()">כניסה</button>
-      </div>
-    </div>
-  `);
-  setTimeout(() => document.getElementById('login-email')?.focus(), 50);
-}
-
-function doLogin() {
-  const email = document.getElementById('login-email')?.value || '';
-  if (!email.trim()) { renderLogin('אנא הזן/י כתובת מייל.'); return; }
-  loginByEmail(email);
-}
-
-function logout() {
-  init();
-}
-
-/* ══════════════════════════════════════════════════════════════════
-   BLOC GOOGLE — à réactiver en production
-   1) Décommenter la balise du script Google (accounts.google.com/gsi/client) dans le <head>
-   2) Remplacer renderLogin / doLogin / logout ci-dessus par ce bloc
-
+// ── LOGIN GOOGLE ──
+// (Pour repasser en mode test sans Google : voir le bloc "LOGIN DEV" en commentaire plus bas)
 function renderLogin(err) {
   setRoot(`
     <div class="card login-card">
@@ -368,7 +330,11 @@ function initGoogleSignIn() {
   const btnContainer = document.getElementById('google-signin-btn');
   if (btnContainer) {
     google.accounts.id.renderButton(btnContainer, {
-      theme: 'filled_blue', size: 'large', shape: 'pill', text: 'signin_with', locale: 'he'
+      theme: 'filled_blue',
+      size: 'large',
+      shape: 'pill',
+      text: 'signin_with',
+      locale: 'he'
     });
   }
 }
@@ -386,9 +352,18 @@ async function handleGoogleCredential(response) {
   try {
     const payload = decodeJwt(response.credential);
     const email = (payload.email || '').trim().toLowerCase();
-    if (payload.email_verified === false) { renderLogin('חשבון הגוגל שלך אינו מאומת.'); return; }
+
+    if (payload.email_verified === false) {
+      renderLogin('חשבון הגוגל שלך אינו מאומת.');
+      return;
+    }
+
     const domain = email.split('@')[1] || '';
-    if (domain !== ALLOWED_DOMAIN) { renderLogin(`יש להתחבר עם חשבון @${ALLOWED_DOMAIN} בלבד.`); return; }
+    if (domain !== ALLOWED_DOMAIN) {
+      renderLogin(`יש להתחבר עם חשבון @${ALLOWED_DOMAIN} בלבד.`);
+      return;
+    }
+
     await loginByEmail(email);
   } catch (e) {
     renderLogin('שגיאה בהתחברות: ' + e.message);
@@ -399,6 +374,40 @@ function logout() {
   if (window.google && google.accounts && google.accounts.id) {
     google.accounts.id.disableAutoSelect();
   }
+  init();
+}
+
+/* ══════════════════════════════════════════════════════════════════
+   LOGIN DEV — connexion par email libre, pour tester les comptes des
+   autres profs. Pour l'activer :
+   1) Commenter la balise du script Google (accounts.google.com/gsi/client) dans le head
+   2) Remplacer renderLogin / initGoogleSignIn / decodeJwt /
+      handleGoogleCredential / logout ci-dessus par ce bloc
+
+function renderLogin(err) {
+  setRoot(`
+    <div class="card login-card">
+      <div class="login-title">שלום! 👋</div>
+      <div class="login-sub">Mode test — entrez l'email d'un professeur</div>
+      <div class="dev-banner">🔧 MODE DÉVELOPPEMENT — connexion sans Google</div>
+      ${err ? `<div class="error-msg">${err}</div>` : ''}
+      <div class="email-row">
+        <input type="email" class="email-input" id="login-email" placeholder="prenom@oulpanlavi.com"
+               onkeydown="if(event.key==='Enter') doLogin()" autocomplete="off" />
+        <button class="btn-blue" onclick="doLogin()">כניסה</button>
+      </div>
+    </div>
+  `);
+  setTimeout(() => document.getElementById('login-email')?.focus(), 50);
+}
+
+function doLogin() {
+  const email = document.getElementById('login-email')?.value || '';
+  if (!email.trim()) { renderLogin('אנא הזן/י כתובת מייל.'); return; }
+  loginByEmail(email);
+}
+
+function logout() {
   init();
 }
 
