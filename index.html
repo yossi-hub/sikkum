@@ -804,7 +804,7 @@ function buildStudentChecklist(cls, existingMap) {
   for (const sid of sortedIds) {
     const name = state.students[sid] || sid;
     const rec = existingMap[sid];
-    const checked = rec ? rec.present : true;
+    const checked = rec ? rec.present : false;
     html += `<label class="pres-row"><input type="checkbox" class="pres-check" id="pc-${cls.id}-${sid}" ${checked ? 'checked' : ''} /> <span>${name}</span></label>`;
   }
   html += '</div>';
@@ -1061,7 +1061,7 @@ async function confirmRemplacement() {
     const listHtml = sortedIds.map(sid => {
       const name = state.students[sid] || sid;
       const rec = existingMap[sid];
-      const checked = rec ? rec.present : true;
+      const checked = rec ? rec.present : false;
       return `<label class="pres-row"><input type="checkbox" class="pres-check" id="rc-${sid}" ${checked ? 'checked' : ''} /> <span>${name}</span></label>`;
     }).join('');
     document.getElementById('remp-results').innerHTML = `
