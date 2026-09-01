@@ -149,6 +149,8 @@ textarea.bakasha-input { min-height: 80px; resize: vertical; }
 .annuaire-status.active { background: rgba(29,134,83,0.12); color: #1d8653; }
 .annuaire-status.inactive { background: #eee; color: #aaa; }
 .annuaire-empty { text-align: center; color: #888; padding: 2rem; font-size: 13px; }
+.annuaire-booking { display: inline-block; margin-top: 10px; padding: 7px 16px; border-radius: 20px; background: #f55700; color: #fff; font-family: 'League Spartan', sans-serif; font-size: 12px; font-weight: 700; text-decoration: none; transition: background .15s; }
+.annuaire-booking:hover { background: #d94a00; }
 
 @media (max-width: 680px) { .welcome-cards { grid-template-columns: 1fr; } }
 
@@ -231,6 +233,8 @@ const FLD_RH_EMAIL_PRO    = 'fldxrsp5qoh82YrQS';
 const FLD_RH_EMAIL_PERSO  = 'fldXZPw6L3rXhbQdm';
 const FLD_RH_STATUS       = 'fld3CnyNjQx1tCLJ2';
 const FLD_RH_PHOTO        = 'fld3UKG7ORMGHWbNu';
+const FLD_RH_ADDRESS      = 'fldSn8nGxEoLXa4X2';
+const FLD_RH_BOOKING      = 'fldXWjD6TAHKVWeP4';
 
 // ── GOOGLE AUTH ──
 const GOOGLE_CLIENT_ID  = '208792012375-tah7nn3utsgsnbgs9fv2ah5mr17qcr6n.apps.googleusercontent.com';
@@ -1179,15 +1183,18 @@ async function loadAnnuaire() {
     state.annuaire = recs.map(r => {
       const f = r.fields;
       const photo = (f[FLD_RH_PHOTO] || [])[0];
+      const booking = f[FLD_RH_BOOKING];
       return {
         id: r.id,
         name: (f[FLD_RH_NAME] || '').trim(),
         role: (f[FLD_RH_ROLE] || '').trim(),
         city: (f[FLD_RH_CITY] || '').trim(),
+        address: (f[FLD_RH_ADDRESS] || '').trim(),
         phone: (f[FLD_RH_PHONE] || '').trim(),
         email: (f[FLD_RH_EMAIL_PRO] || f[FLD_RH_EMAIL_PERSO] || '').trim(),
         status: (f[FLD_RH_STATUS] && f[FLD_RH_STATUS].name) || '',
-        photoUrl: photo ? (photo.thumbnails?.large?.url || photo.url) : null
+        photoUrl: photo ? (photo.thumbnails?.large?.url || photo.url) : null,
+        bookingUrl: (booking && booking.url) ? booking.url.trim() : ''
       };
     });
     annuaireLoaded = true;
@@ -1230,9 +1237,11 @@ function renderAnnuaireTab(filterText) {
           <div class="annuaire-name">${p.name}</div>
           ${p.role ? `<div class="annuaire-role">${p.role}</div>` : ''}
           ${p.city ? `<div class="annuaire-meta">📍 ${p.city}</div>` : ''}
+          ${p.address ? `<div class="annuaire-meta">🏠 ${p.address}</div>` : ''}
           ${p.phone ? `<div class="annuaire-meta">📞 ${p.phone}</div>` : ''}
           ${p.email ? `<div class="annuaire-meta">✉️ ${p.email}</div>` : ''}
           <div class="annuaire-status ${statusClass}">${statusLabel}</div>
+          ${p.bookingUrl ? `<div><a class="annuaire-booking" href="${p.bookingUrl}" target="_blank" rel="noopener">📅 קביעת פגישה</a></div>` : ''}
         </div>`;
     }
     html += `</div>`;
