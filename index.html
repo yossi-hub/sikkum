@@ -1010,7 +1010,7 @@ function buildPresenceHtml() {
             </div>
             <div class="field-group" style="max-width:140px;">
               <label class="field-label">פרק</label>
-              <input type="number" class="field-input" id="pres-chapitre-${cls.id}" value="${meta.chapitre !== '' ? meta.chapitre : ''}" step="0.1" style="direction:ltr;" />
+              <input type="number" class="field-input" id="pres-chapitre-${cls.id}" value="${meta.chapitre !== '' ? meta.chapitre : ''}" step="1" min="0" style="direction:ltr;" oninput="this.value = this.value.replace(/[^0-9]/g, '')" />
             </div>
             <div class="field-group infos-full">
               <label class="field-label">מס' שיעור ושקופית במצגת</label>
@@ -1102,7 +1102,7 @@ async function submitPresence(classId) {
 
   const isoDate = `${dateStr}T12:00:00.000Z`;
   const chapitreRaw = document.getElementById(`pres-chapitre-${classId}`)?.value;
-  const chapitreVal = chapitreRaw !== undefined && chapitreRaw !== '' ? parseFloat(chapitreRaw) : null;
+  const chapitreVal = chapitreRaw !== undefined && chapitreRaw !== '' ? parseInt(chapitreRaw, 10) : null;
   const leconVal = document.getElementById(`pres-lecon-${classId}`)?.value || '';
   const toCreate = [], toUpdate = [];
   for (const sid of cls.studentIds) {
