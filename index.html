@@ -221,6 +221,7 @@ table.contact-table { width: 100%; border-collapse: collapse; font-size: 12.5px;
     <button class="tab-btn" onclick="switchTab('presence')">✅ נוכחות</button>
     <button class="tab-btn" onclick="switchTab('annuaire')">👥 אנשי צוות</button>
     <button class="tab-btn" onclick="switchTab('mesclasses')">🏫 הכיתות שלי</button>
+    <button class="tab-btn" onclick="switchTab('points')">🔑 נקודות חשובות</button>
   </div>
   <div class="content">
     <div id="root"></div>
@@ -230,6 +231,7 @@ table.contact-table { width: 100%; border-collapse: collapse; font-size: 12.5px;
       <div id="tab-presence" class="tab-panel"></div>
       <div id="tab-annuaire" class="tab-panel"></div>
       <div id="tab-mesclasses" class="tab-panel"></div>
+      <div id="tab-points" class="tab-panel"></div>
     </div>
   </div>
 </div>
@@ -329,7 +331,7 @@ async function getAll(base, table, params='') {
 // Active visuellement un onglet, sans déclencher de chargement
 function activateTabUI(name) {
   document.querySelectorAll('.tab-btn').forEach((b, i) => {
-    const names = ['sikkum', 'bakasha', 'presence', 'annuaire', 'mesclasses'];
+    const names = ['sikkum', 'bakasha', 'presence', 'annuaire', 'mesclasses', 'points'];
     b.classList.toggle('active', names[i] === name);
   });
   document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
@@ -346,6 +348,8 @@ function switchTab(name) {
     loadAnnuaire();
   } else if (name === 'mesclasses') {
     loadMesClasses();
+  } else if (name === 'points') {
+    renderPointsTab();
   } else if (!classesLoaded && !classesLoading) {
     loadClasses(name);
   }
@@ -541,6 +545,11 @@ function renderWelcome() {
           <div class="welcome-card-title">הכיתות שלי</div>
           <div class="welcome-card-desc">Détails complets de vos classes</div>
         </div>
+        <div class="welcome-card" onclick="openTab('points')">
+          <div class="welcome-card-icon">🔑</div>
+          <div class="welcome-card-title">נקודות חשובות</div>
+          <div class="welcome-card-desc">Points importants et contacts utiles</div>
+        </div>
       </div>
     </div>
   `);
@@ -556,6 +565,9 @@ async function openTab(tabName) {
   } else if (tabName === 'mesclasses') {
     showTabs();
     switchTab('mesclasses');
+  } else if (tabName === 'points') {
+    showTabs();
+    switchTab('points');
   } else if (!classesLoaded) {
     if (!classesLoading) await loadClasses(tabName);
   } else {
@@ -1397,44 +1409,6 @@ function statusCssClass(status) {
 function renderMesClassesTab() {
   const list = state.mesclasses || [];
   let html = `
-    <div class="card points-card">
-      <div class="points-title">🔑 Les points importants du prof</div>
-      <ul class="points-list">
-        <li>Une classe ne s'ouvre que si elle atteint le nombre minimum d'inscrits.</li>
-        <li>Les dates de début affichées sont donc indicatives tant que la classe n'est pas formée.</li>
-        <li>Une fois le nombre minimum d'inscrits atteint, vous recevrez un mail qui confirme cette fois la date de début de la classe.</li>
-        <li>Pour les classes Zoom, vous devez lancer la réunion qui porte le numéro de votre classe. Exemple : cliquez sur 101 pour lancer le cours de la classe 101.</li>
-        <li>Les liens d'enregistrement des cours Zoom sont automatiquement ajoutés à la "Fiche d'information des élèves".</li>
-        <li>Pensez à remplir la feuille de présence au début de chaque cours.</li>
-        <li>Si un élève n'apparaît pas dans la liste, prévenez Michal 😉.</li>
-        <li>Si vous avez un problème avec votre classe, contactez Michal 😉.</li>
-      </ul>
-      <div class="contact-subtitle">Qui contacter ?</div>
-      <div class="contact-table-wrap">
-        <table class="contact-table">
-          <thead><tr>
-            <th>Sujet</th>
-            <th>Responsable principal</th>
-            <th>Responsable secondaire</th>
-          </tr></thead>
-          <tbody>
-            <tr><td>Calendrier annuel (calendrier, horaires de cours, lieu des cours)</td><td>Michal</td><td>Yossi</td></tr>
-            <tr><td>Annulation de cours</td><td>Shai</td><td>Michal</td></tr>
-            <tr><td>Salaire, paiements, reporting</td><td>Yossi</td><td>-</td></tr>
-            <tr><td>Problèmes techniques en classe (Compte Zoom, clé de la classe, nettoyage, chauffage, tableau, projecteur, écran)</td><td>Michal</td><td>Yossi</td></tr>
-            <tr><td>Matériel pédagogique</td><td>Shai</td><td>-</td></tr>
-            <tr><td>Questions liées aux élèves</td><td>Michal</td><td>Yossi ou Shai</td></tr>
-            <tr><td>Changements majeurs ou problèmes importants</td><td>Yossi et/ou Shai</td><td>-</td></tr>
-            <tr><td>Idées pour de nouveaux projets</td><td>Yossi et/ou Shai</td><td>-</td></tr>
-            <tr><td>Changement dans la liste des élèves</td><td>Michal</td><td>-</td></tr>
-            <tr><td>Classes renouvelées, réinscriptions</td><td>Michal</td><td>-</td></tr>
-            <tr><td>Fiche de début de cours</td><td>Michal</td><td>-</td></tr>
-            <tr><td>Enregistrements des cours</td><td>Michal</td><td>-</td></tr>
-            <tr><td>Questions sur les livres</td><td>Yossi</td><td>Michal</td></tr>
-          </tbody>
-        </table>
-      </div>
-    </div>
     <div class="prof-header">
       <div>
         <div class="prof-name">${state.teacher.name}</div>
@@ -1473,6 +1447,50 @@ function renderMesClassesTab() {
     html += `</div>`;
   }
   setTab('mesclasses', html);
+}
+
+// ── ONGLET 6 : POINTS IMPORTANTS ──
+function renderPointsTab() {
+  const html = `
+    <div class="card points-card">
+      <div class="points-title">🔑 Les points importants du prof</div>
+      <ul class="points-list">
+        <li>Une classe ne s'ouvre que si elle atteint le nombre minimum d'inscrits.</li>
+        <li>Les dates de début affichées sont donc indicatives tant que la classe n'est pas formée.</li>
+        <li>Une fois le nombre minimum d'inscrits atteint, vous recevrez un mail qui confirme cette fois la date de début de la classe.</li>
+        <li>Pour les classes Zoom, vous devez lancer la réunion qui porte le numéro de votre classe. Exemple : cliquez sur 101 pour lancer le cours de la classe 101.</li>
+        <li>Les liens d'enregistrement des cours Zoom sont automatiquement ajoutés à la "Fiche d'information des élèves".</li>
+        <li>Pensez à remplir la feuille de présence au début de chaque cours.</li>
+        <li>Si un élève n'apparaît pas dans la liste, prévenez Michal 😉.</li>
+        <li>Si vous avez un problème avec votre classe, contactez Michal 😉.</li>
+      </ul>
+      <div class="contact-subtitle">Qui contacter ?</div>
+      <div class="contact-table-wrap">
+        <table class="contact-table">
+          <thead><tr>
+            <th>Sujet</th>
+            <th>Responsable principal</th>
+            <th>Responsable secondaire</th>
+          </tr></thead>
+          <tbody>
+            <tr><td>Calendrier annuel (calendrier, horaires de cours, lieu des cours)</td><td>Michal</td><td>Yossi</td></tr>
+            <tr><td>Annulation de cours</td><td>Shai</td><td>Michal</td></tr>
+            <tr><td>Salaire, paiements, reporting</td><td>Yossi</td><td>-</td></tr>
+            <tr><td>Problèmes techniques en classe (Compte Zoom, clé de la classe, nettoyage, chauffage, tableau, projecteur, écran)</td><td>Michal</td><td>Yossi</td></tr>
+            <tr><td>Matériel pédagogique</td><td>Shai</td><td>-</td></tr>
+            <tr><td>Questions liées aux élèves</td><td>Michal</td><td>Yossi ou Shai</td></tr>
+            <tr><td>Changements majeurs ou problèmes importants</td><td>Yossi et/ou Shai</td><td>-</td></tr>
+            <tr><td>Idées pour de nouveaux projets</td><td>Yossi et/ou Shai</td><td>-</td></tr>
+            <tr><td>Changement dans la liste des élèves</td><td>Michal</td><td>-</td></tr>
+            <tr><td>Classes renouvelées, réinscriptions</td><td>Michal</td><td>-</td></tr>
+            <tr><td>Fiche de début de cours</td><td>Michal</td><td>-</td></tr>
+            <tr><td>Enregistrements des cours</td><td>Michal</td><td>-</td></tr>
+            <tr><td>Questions sur les livres</td><td>Yossi</td><td>Michal</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>`;
+  setTab('points', html);
 }
 
 // ── ONGLET 2 : BAKASHA ──
