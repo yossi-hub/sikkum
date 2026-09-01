@@ -170,6 +170,17 @@ textarea.bakasha-input { min-height: 80px; resize: vertical; }
 .mesclasses-status.creation { background: #eee; color: #999; }
 .mesclasses-fiche { display: inline-block; margin-top: 4px; padding: 7px 14px; border-radius: 20px; background: #f55700; color: #fff; font-family: 'League Spartan', sans-serif; font-size: 12px; font-weight: 700; text-decoration: none; text-align: center; }
 .mesclasses-fiche:hover { background: #d94a00; }
+.points-card { direction: ltr; margin-bottom: 1.5rem; }
+.points-title { font-family: 'League Spartan', sans-serif; font-size: 18px; font-weight: 700; color: #025db8; margin-bottom: 12px; }
+.points-list { list-style: none; display: flex; flex-direction: column; gap: 10px; margin-bottom: 1.5rem; }
+.points-list li { font-size: 13px; color: #2e2e2e; line-height: 1.5; padding-right: 0; padding-left: 22px; position: relative; }
+.points-list li::before { content: "•"; color: #f55700; font-weight: 700; position: absolute; left: 0; top: 0; }
+.contact-subtitle { font-family: 'League Spartan', sans-serif; font-size: 15px; font-weight: 700; color: #2e2e2e; margin-bottom: 10px; }
+.contact-table-wrap { overflow-x: auto; }
+table.contact-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+.contact-table th { padding: 8px 12px; font-weight: 600; color: #888; text-align: left; background: #f5f2ee; border-bottom: 0.5px solid rgba(2,93,184,0.1); white-space: nowrap; }
+.contact-table td { padding: 8px 12px; border-bottom: 0.5px solid rgba(2,93,184,0.07); color: #2e2e2e; }
+.contact-table tr:last-child td { border-bottom: none; }
 
 @media (max-width: 680px) { .welcome-cards { grid-template-columns: 1fr; } }
 
@@ -1386,6 +1397,44 @@ function statusCssClass(status) {
 function renderMesClassesTab() {
   const list = state.mesclasses || [];
   let html = `
+    <div class="card points-card">
+      <div class="points-title">🔑 Les points importants du prof</div>
+      <ul class="points-list">
+        <li>Une classe ne s'ouvre que si elle atteint le nombre minimum d'inscrits.</li>
+        <li>Les dates de début affichées sont donc indicatives tant que la classe n'est pas formée.</li>
+        <li>Une fois le nombre minimum d'inscrits atteint, vous recevrez un mail qui confirme cette fois la date de début de la classe.</li>
+        <li>Pour les classes Zoom, vous devez lancer la réunion qui porte le numéro de votre classe. Exemple : cliquez sur 101 pour lancer le cours de la classe 101.</li>
+        <li>Les liens d'enregistrement des cours Zoom sont automatiquement ajoutés à la "Fiche d'information des élèves".</li>
+        <li>Pensez à remplir la feuille de présence au début de chaque cours.</li>
+        <li>Si un élève n'apparaît pas dans la liste, prévenez Michal 😉.</li>
+        <li>Si vous avez un problème avec votre classe, contactez Michal 😉.</li>
+      </ul>
+      <div class="contact-subtitle">Qui contacter ?</div>
+      <div class="contact-table-wrap">
+        <table class="contact-table">
+          <thead><tr>
+            <th>Sujet</th>
+            <th>Responsable principal</th>
+            <th>Responsable secondaire</th>
+          </tr></thead>
+          <tbody>
+            <tr><td>Calendrier annuel (calendrier, horaires de cours, lieu des cours)</td><td>Michal</td><td>Yossi</td></tr>
+            <tr><td>Annulation de cours</td><td>Shai</td><td>Michal</td></tr>
+            <tr><td>Salaire, paiements, reporting</td><td>Yossi</td><td>-</td></tr>
+            <tr><td>Problèmes techniques en classe (Compte Zoom, clé de la classe, nettoyage, chauffage, tableau, projecteur, écran)</td><td>Michal</td><td>Yossi</td></tr>
+            <tr><td>Matériel pédagogique</td><td>Shai</td><td>-</td></tr>
+            <tr><td>Questions liées aux élèves</td><td>Michal</td><td>Yossi ou Shai</td></tr>
+            <tr><td>Changements majeurs ou problèmes importants</td><td>Yossi et/ou Shai</td><td>-</td></tr>
+            <tr><td>Idées pour de nouveaux projets</td><td>Yossi et/ou Shai</td><td>-</td></tr>
+            <tr><td>Changement dans la liste des élèves</td><td>Michal</td><td>-</td></tr>
+            <tr><td>Classes renouvelées, réinscriptions</td><td>Michal</td><td>-</td></tr>
+            <tr><td>Fiche de début de cours</td><td>Michal</td><td>-</td></tr>
+            <tr><td>Enregistrements des cours</td><td>Michal</td><td>-</td></tr>
+            <tr><td>Questions sur les livres</td><td>Yossi</td><td>Michal</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
     <div class="prof-header">
       <div>
         <div class="prof-name">${state.teacher.name}</div>
