@@ -129,12 +129,27 @@ textarea.bakasha-input { min-height: 80px; resize: vertical; }
 .welcome-screen { max-width: 700px; margin: 2.5rem auto; text-align: center; }
 .welcome-name { font-family: 'League Spartan', sans-serif; font-size: 24px; font-weight: 700; color: #025db8; margin-bottom: 4px; }
 .welcome-sub { font-size: 13px; color: #888; margin-bottom: 2rem; direction: ltr; }
-.welcome-cards { display: grid; grid-template-columns: repeat(3, 1fr); gap: 1rem; }
+.welcome-cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 1rem; }
 .welcome-card { background: #FFF9F2; border: 0.5px solid rgba(2,93,184,0.2); border-radius: 14px; padding: 2rem 1.5rem; cursor: pointer; transition: transform .15s, box-shadow .15s, border-color .15s; text-align: center; }
 .welcome-card:hover { transform: translateY(-3px); box-shadow: 0 6px 20px rgba(2,93,184,0.12); border-color: #025db8; }
 .welcome-card-icon { font-size: 36px; margin-bottom: 0.75rem; }
 .welcome-card-title { font-family: 'League Spartan', sans-serif; font-size: 16px; font-weight: 700; color: #2e2e2e; margin-bottom: 6px; }
 .welcome-card-desc { font-size: 12px; color: #888; line-height: 1.5; direction: ltr; }
+
+/* ── ONGLET 4 : ANNUAIRE ── */
+.annuaire-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(190px, 1fr)); gap: 14px; }
+.annuaire-card { background: #FFF9F2; border: 0.5px solid rgba(2,93,184,0.15); border-radius: 12px; padding: 1rem; text-align: center; transition: box-shadow .15s, border-color .15s; }
+.annuaire-card:hover { box-shadow: 0 4px 16px rgba(2,93,184,0.1); border-color: #025db8; }
+.annuaire-photo { width: 84px; height: 84px; border-radius: 50%; object-fit: cover; margin: 0 auto 10px; display: block; }
+.annuaire-photo-placeholder { width: 84px; height: 84px; border-radius: 50%; margin: 0 auto 10px; display: flex; align-items: center; justify-content: center; background: #025db8; color: #fff; font-family: 'League Spartan', sans-serif; font-weight: 700; font-size: 24px; }
+.annuaire-name { font-family: 'League Spartan', sans-serif; font-weight: 700; font-size: 15px; color: #2e2e2e; margin-bottom: 2px; }
+.annuaire-role { font-size: 12px; color: #025db8; font-weight: 500; margin-bottom: 8px; }
+.annuaire-meta { font-size: 12px; color: #888; margin-bottom: 3px; direction: ltr; }
+.annuaire-status { display: inline-block; border-radius: 20px; font-size: 10px; font-weight: 600; padding: 2px 9px; margin-top: 6px; }
+.annuaire-status.active { background: rgba(29,134,83,0.12); color: #1d8653; }
+.annuaire-status.inactive { background: #eee; color: #aaa; }
+.annuaire-empty { text-align: center; color: #888; padding: 2rem; font-size: 13px; }
+
 @media (max-width: 680px) { .welcome-cards { grid-template-columns: 1fr; } }
 
 /* ── SHARED ── */
@@ -164,14 +179,15 @@ textarea.bakasha-input { min-height: 80px; resize: vertical; }
       <span class="lavi">Lavi</span>
     </div>
     <div id="header-right" class="header-right">
-      <div class="header-title">דוח סיום שנה</div>
-      <div class="header-sub">Rapport annuel fin d'année • 5786</div>
+      <div class="header-title">Lavi's Teacher App</div>
+      <div class="header-sub">Présences, Bilans, etc.</div>
     </div>
   </div>
   <div id="tabs-bar" class="tabs-bar" style="display:none;">
     <button class="tab-btn active" onclick="switchTab('sikkum')">📋 דוח סיום שנה</button>
     <button class="tab-btn" onclick="switchTab('bakasha')">📝 בקשות לשנה הבאה</button>
     <button class="tab-btn" onclick="switchTab('presence')">✅ נוכחות</button>
+    <button class="tab-btn" onclick="switchTab('annuaire')">👥 אנשי צוות</button>
   </div>
   <div class="content">
     <div id="root"></div>
@@ -179,6 +195,7 @@ textarea.bakasha-input { min-height: 80px; resize: vertical; }
       <div id="tab-sikkum" class="tab-panel active"></div>
       <div id="tab-bakasha" class="tab-panel"></div>
       <div id="tab-presence" class="tab-panel"></div>
+      <div id="tab-annuaire" class="tab-panel"></div>
     </div>
   </div>
 </div>
@@ -202,17 +219,32 @@ const FLD_PRES_DATE    = 'fldMOUWRqgoR0rYe7'; // Date (dateTime)
 const FLD_PRES_PRESENT = 'fld6XD60QTpapL0Jq'; // Présente (checkbox)
 const FLD_PRES_PROF    = 'fldS9wwl4L5TtJ44z'; // Prof (texte, nom de la personne qui a rempli)
 
+// Base RH — annuaire de l'équipe (vue "Photo Directory")
+const BASE_RH            = 'appDIFUhvkazrti2M';
+const TABLE_RH            = 'tblnL1EXuEFAABbfY';
+const VIEW_RH_DIRECTORY   = 'viw7Ut4UInvAuyoWa'; // vue "Photo Directory"
+const FLD_RH_NAME         = 'fld6dTKwSW8v6nkPL';
+const FLD_RH_ROLE         = 'fld4WxUTUVbR7XJh0';
+const FLD_RH_CITY         = 'fld0JqDKhfTJbxShD';
+const FLD_RH_PHONE        = 'fldxCNA0HscTA63pg';
+const FLD_RH_EMAIL_PRO    = 'fldxrsp5qoh82YrQS';
+const FLD_RH_EMAIL_PERSO  = 'fldXZPw6L3rXhbQdm';
+const FLD_RH_STATUS       = 'fld3CnyNjQx1tCLJ2';
+const FLD_RH_PHOTO        = 'fld3UKG7ORMGHWbNu';
+
 // ── GOOGLE AUTH ──
 const GOOGLE_CLIENT_ID  = '208792012375-tah7nn3utsgsnbgs9fv2ah5mr17qcr6n.apps.googleusercontent.com';
 const ALLOWED_DOMAIN    = 'oulpanlavi.com';
 
 let sentClasses = {};
+let annuaireLoaded = false;
+let annuaireLoading = false;
 let allClassesLight = null;
 let remplacementSelected = null;
 let sessionId = 0;          // incrémenté à chaque init/déconnexion : invalide les chargements en cours
 let classesLoading = false; // évite de relancer un chargement déjà en cours
 let classesLoaded = false;  // vrai une fois les classes chargées avec succès
-let state = { teacher: null, classes: [], students: {}, presences: {}, rapportRecords: {}, presenceRecordsToday: {}, presenceCache: {} };
+let state = { teacher: null, classes: [], students: {}, presences: {}, rapportRecords: {}, presenceRecordsToday: {}, presenceCache: {}, annuaire: [] };
 
 // ── API ──
 async function api(base, table, params='', method='GET', body=null) {
@@ -241,7 +273,7 @@ async function getAll(base, table, params='') {
 // Active visuellement un onglet, sans déclencher de chargement
 function activateTabUI(name) {
   document.querySelectorAll('.tab-btn').forEach((b, i) => {
-    const names = ['sikkum', 'bakasha', 'presence'];
+    const names = ['sikkum', 'bakasha', 'presence', 'annuaire'];
     b.classList.toggle('active', names[i] === name);
   });
   document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
@@ -254,6 +286,8 @@ function switchTab(name) {
   activateTabUI(name);
   if (name === 'bakasha') {
     renderBakasha();
+  } else if (name === 'annuaire') {
+    loadAnnuaire();
   } else if (!classesLoaded && !classesLoading) {
     loadClasses(name);
   }
@@ -295,10 +329,12 @@ function init() {
   sessionId++;          // invalide tout chargement encore en cours
   classesLoading = false;
   classesLoaded = false;
+  annuaireLoading = false;
+  annuaireLoaded = false;
   sentClasses = {};
   allClassesLight = null;
   remplacementSelected = null;
-  state = { teacher: null, classes: [], students: {}, presences: {}, rapportRecords: {}, presenceRecordsToday: {}, presenceCache: {} };
+  state = { teacher: null, classes: [], students: {}, presences: {}, rapportRecords: {}, presenceRecordsToday: {}, presenceCache: {}, annuaire: [] };
   renderHeaderDefault();
   hideTabs();
   renderLogin();
@@ -435,6 +471,11 @@ function renderWelcome() {
           <div class="welcome-card-title">בקשות לשנה הבאה</div>
           <div class="welcome-card-desc">Vos préférences et demandes pour l'année 5787</div>
         </div>
+        <div class="welcome-card" onclick="openTab('annuaire')">
+          <div class="welcome-card-icon">👥</div>
+          <div class="welcome-card-title">אנשי צוות</div>
+          <div class="welcome-card-desc">Annuaire de l'équipe Oulpan Lavi</div>
+        </div>
       </div>
     </div>
   `);
@@ -444,6 +485,9 @@ async function openTab(tabName) {
   if (tabName === 'bakasha') {
     showTabs();
     switchTab('bakasha');
+  } else if (tabName === 'annuaire') {
+    showTabs();
+    switchTab('annuaire');
   } else if (!classesLoaded) {
     if (!classesLoading) await loadClasses(tabName);
   } else {
@@ -553,6 +597,7 @@ async function loadClasses(targetTab) {
     renderPresenceTab();
     activateTabUI(targetTab);
     if (targetTab === 'bakasha') renderBakasha();
+    if (targetTab === 'annuaire') loadAnnuaire();
   } catch(e) {
     // Ne rien afficher si l'utilisateur s'est déconnecté entre-temps
     if (mySession === sessionId) setRoot(`<div class="error-msg">Erreur : ${e.message}</div>`);
@@ -804,7 +849,7 @@ function buildStudentChecklist(cls, existingMap) {
   for (const sid of sortedIds) {
     const name = state.students[sid] || sid;
     const rec = existingMap[sid];
-    const checked = rec ? rec.present : true;
+    const checked = rec ? rec.present : false;
     html += `<label class="pres-row"><input type="checkbox" class="pres-check" id="pc-${cls.id}-${sid}" ${checked ? 'checked' : ''} /> <span>${name}</span></label>`;
   }
   html += '</div>';
@@ -1061,7 +1106,7 @@ async function confirmRemplacement() {
     const listHtml = sortedIds.map(sid => {
       const name = state.students[sid] || sid;
       const rec = existingMap[sid];
-      const checked = rec ? rec.present : true;
+      const checked = rec ? rec.present : false;
       return `<label class="pres-row"><input type="checkbox" class="pres-check" id="rc-${sid}" ${checked ? 'checked' : ''} /> <span>${name}</span></label>`;
     }).join('');
     document.getElementById('remp-results').innerHTML = `
@@ -1119,6 +1164,84 @@ async function submitRemplacementPresence(dateStr) {
     if (btn) { btn.disabled = false; btn.textContent = '💾 שמירת נוכחות'; }
     const errEl = document.getElementById('remp-submit-error');
     if (errEl) errEl.innerHTML = `<div class="error-msg">Erreur : ${e.message}</div>`;
+  }
+}
+
+// ── ONGLET 4 : ANNUAIRE ──
+async function loadAnnuaire() {
+  if (annuaireLoaded || annuaireLoading) { renderAnnuaireTab(); return; }
+  const mySession = sessionId;
+  annuaireLoading = true;
+  setTab('annuaire', `<div class="loading"><div class="spinner"></div><br>טוען אנשי צוות...</div>`);
+  try {
+    const recs = await getAll(BASE_RH, TABLE_RH, `?view=${VIEW_RH_DIRECTORY}&returnFieldsByFieldId=true`);
+    if (mySession !== sessionId) return;
+    state.annuaire = recs.map(r => {
+      const f = r.fields;
+      const photo = (f[FLD_RH_PHOTO] || [])[0];
+      return {
+        id: r.id,
+        name: (f[FLD_RH_NAME] || '').trim(),
+        role: (f[FLD_RH_ROLE] || '').trim(),
+        city: (f[FLD_RH_CITY] || '').trim(),
+        phone: (f[FLD_RH_PHONE] || '').trim(),
+        email: (f[FLD_RH_EMAIL_PRO] || f[FLD_RH_EMAIL_PERSO] || '').trim(),
+        status: (f[FLD_RH_STATUS] && f[FLD_RH_STATUS].name) || '',
+        photoUrl: photo ? (photo.thumbnails?.large?.url || photo.url) : null
+      };
+    }).sort((a, b) => a.name.localeCompare(b.name, 'fr'));
+    annuaireLoaded = true;
+    renderAnnuaireTab();
+  } catch (e) {
+    if (mySession === sessionId) setTab('annuaire', `<div class="error-msg">Erreur : ${e.message}</div>`);
+  } finally {
+    if (mySession === sessionId) annuaireLoading = false;
+  }
+}
+
+function renderAnnuaireTab(filterText) {
+  const q = (filterText || '').trim().toLowerCase();
+  const list = q
+    ? state.annuaire.filter(p =>
+        p.name.toLowerCase().includes(q) ||
+        p.role.toLowerCase().includes(q) ||
+        p.city.toLowerCase().includes(q))
+    : state.annuaire;
+
+  let html = `
+    <div style="margin-bottom:1rem;">
+      <input type="text" class="bakasha-input" id="annuaire-search" placeholder="חיפוש לפי שם, תפקיד או עיר..." style="direction:ltr;" oninput="renderAnnuaireTab(this.value)" />
+    </div>`;
+
+  if (!list.length) {
+    html += `<div class="annuaire-empty">לא נמצאו תוצאות</div>`;
+  } else {
+    html += `<div class="annuaire-grid">`;
+    for (const p of list) {
+      const initials = p.name.split(' ').filter(Boolean).slice(0, 2).map(w => w[0]).join('').toUpperCase();
+      const photoHtml = p.photoUrl
+        ? `<img class="annuaire-photo" src="${p.photoUrl}" alt="${p.name}" />`
+        : `<div class="annuaire-photo-placeholder">${initials}</div>`;
+      const statusClass = p.status === 'Active' ? 'active' : 'inactive';
+      const statusLabel = p.status === 'Active' ? '✓ פעיל/ה' : (p.status || '—');
+      html += `
+        <div class="annuaire-card">
+          ${photoHtml}
+          <div class="annuaire-name">${p.name}</div>
+          ${p.role ? `<div class="annuaire-role">${p.role}</div>` : ''}
+          ${p.city ? `<div class="annuaire-meta">📍 ${p.city}</div>` : ''}
+          ${p.phone ? `<div class="annuaire-meta">📞 ${p.phone}</div>` : ''}
+          ${p.email ? `<div class="annuaire-meta">✉️ ${p.email}</div>` : ''}
+          <div class="annuaire-status ${statusClass}">${statusLabel}</div>
+        </div>`;
+    }
+    html += `</div>`;
+  }
+  setTab('annuaire', html);
+  const input = document.getElementById('annuaire-search');
+  if (input && filterText !== undefined) {
+    input.focus();
+    input.setSelectionRange(input.value.length, input.value.length);
   }
 }
 
