@@ -152,6 +152,36 @@ textarea.bakasha-input { min-height: 80px; resize: vertical; }
 .annuaire-booking { display: inline-block; margin-top: 10px; padding: 7px 16px; border-radius: 20px; background: #f55700; color: #fff; font-family: 'League Spartan', sans-serif; font-size: 12px; font-weight: 700; text-decoration: none; transition: background .15s; }
 .annuaire-booking:hover { background: #d94a00; }
 
+/* ── ONGLET 5 : VOS CLASSES ── */
+.mesclasses-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 14px; }
+.mesclasses-card { background: #FFF9F2; border: 0.5px solid rgba(2,93,184,0.15); border-radius: 12px; overflow: hidden; transition: box-shadow .15s, border-color .15s; }
+.mesclasses-card:hover { box-shadow: 0 4px 16px rgba(2,93,184,0.1); border-color: #025db8; }
+.mesclasses-head { background: #025db8; padding: 0.85rem 1.1rem; }
+.mesclasses-title { font-family: 'League Spartan', sans-serif; font-size: 17px; font-weight: 700; color: #fff; }
+.mesclasses-autoid { font-size: 11px; color: rgba(255,255,255,0.7); margin-top: 2px; direction: ltr; }
+.mesclasses-body { padding: 1rem 1.1rem; display: flex; flex-direction: column; gap: 7px; }
+.mesclasses-row { display: flex; justify-content: space-between; gap: 10px; font-size: 12.5px; }
+.mesclasses-row-label { color: #888; }
+.mesclasses-row-value { color: #2e2e2e; font-weight: 500; text-align: left; direction: ltr; }
+.mesclasses-status { display: inline-block; border-radius: 20px; font-size: 11px; font-weight: 600; padding: 2px 10px; }
+.mesclasses-status.complete { background: rgba(29,134,83,0.12); color: #1d8653; }
+.mesclasses-status.inprogress { background: rgba(2,93,184,0.12); color: #025db8; }
+.mesclasses-status.upcoming { background: rgba(248,207,62,0.25); color: #a07d00; }
+.mesclasses-status.creation { background: #eee; color: #999; }
+.mesclasses-fiche { display: inline-block; margin-top: 4px; padding: 7px 14px; border-radius: 20px; background: #f55700; color: #fff; font-family: 'League Spartan', sans-serif; font-size: 12px; font-weight: 700; text-decoration: none; text-align: center; }
+.mesclasses-fiche:hover { background: #d94a00; }
+.points-card { direction: ltr; margin-bottom: 1.5rem; }
+.points-title { font-family: 'League Spartan', sans-serif; font-size: 18px; font-weight: 700; color: #025db8; margin-bottom: 12px; }
+.points-list { list-style: none; display: flex; flex-direction: column; gap: 10px; margin-bottom: 1.5rem; }
+.points-list li { font-size: 13px; color: #2e2e2e; line-height: 1.5; padding-right: 0; padding-left: 22px; position: relative; }
+.points-list li::before { content: "•"; color: #f55700; font-weight: 700; position: absolute; left: 0; top: 0; }
+.contact-subtitle { font-family: 'League Spartan', sans-serif; font-size: 15px; font-weight: 700; color: #2e2e2e; margin-bottom: 10px; }
+.contact-table-wrap { overflow-x: auto; }
+table.contact-table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+.contact-table th { padding: 8px 12px; font-weight: 600; color: #888; text-align: left; background: #f5f2ee; border-bottom: 0.5px solid rgba(2,93,184,0.1); white-space: nowrap; }
+.contact-table td { padding: 8px 12px; border-bottom: 0.5px solid rgba(2,93,184,0.07); color: #2e2e2e; }
+.contact-table tr:last-child td { border-bottom: none; }
+
 @media (max-width: 680px) { .welcome-cards { grid-template-columns: 1fr; } }
 
 /* ── SHARED ── */
@@ -186,10 +216,13 @@ textarea.bakasha-input { min-height: 80px; resize: vertical; }
     </div>
   </div>
   <div id="tabs-bar" class="tabs-bar" style="display:none;">
-    <button class="tab-btn active" onclick="switchTab('sikkum')">📋 דוח סיום שנה</button>
-    <button class="tab-btn" onclick="switchTab('bakasha')">📝 בקשות לשנה הבאה</button>
+    <button class="tab-btn active" onclick="switchTab('annuaire')">👥 אנשי צוות</button>
+    <button class="tab-btn" onclick="switchTab('mesclasses')">🏫 הכיתות שלי</button>
     <button class="tab-btn" onclick="switchTab('presence')">✅ נוכחות</button>
-    <button class="tab-btn" onclick="switchTab('annuaire')">👥 אנשי צוות</button>
+    <button class="tab-btn" onclick="switchTab('sikkum')">📋 דוח סיום שנה</button>
+    <button class="tab-btn" onclick="switchTab('points')">🔑 נקודות חשובות</button>
+    <button class="tab-btn" onclick="switchTab('absence')">🤒 דיווח היעדרות</button>
+    <button class="tab-btn" onclick="switchTab('bakasha')">📝 בקשות לשנה הבאה</button>
   </div>
   <div class="content">
     <div id="root"></div>
@@ -198,6 +231,9 @@ textarea.bakasha-input { min-height: 80px; resize: vertical; }
       <div id="tab-bakasha" class="tab-panel"></div>
       <div id="tab-presence" class="tab-panel"></div>
       <div id="tab-annuaire" class="tab-panel"></div>
+      <div id="tab-mesclasses" class="tab-panel"></div>
+      <div id="tab-points" class="tab-panel"></div>
+      <div id="tab-absence" class="tab-panel"></div>
     </div>
   </div>
 </div>
@@ -221,6 +257,32 @@ const FLD_PRES_DATE    = 'fldMOUWRqgoR0rYe7'; // Date (dateTime)
 const FLD_PRES_PRESENT = 'fld6XD60QTpapL0Jq'; // Présente (checkbox)
 const FLD_PRES_PROF    = 'fldS9wwl4L5TtJ44z'; // Prof (texte, nom de la personne qui a rempli)
 
+// Champs additionnels de TABLE_CLASSES pour l'onglet "Vos classes"
+const FLD_CL_NUM        = 'fldcKQPOroEmSYmwE'; // Numéro de classe
+const FLD_CL_AUTOID     = 'fldykQrrhZ83in1ri'; // Auto ID
+const FLD_CL_ANCIENNE   = 'fld6DjfmzC4vVy92Y'; // Ancienne Classe
+const FLD_CL_TYPE       = 'fldCuRG3sEcLnT5fK'; // Type
+const FLD_CL_ENDROIT    = 'fldaewXOB571FRk08'; // Endroit
+const FLD_CL_HOURS      = 'fldHQOhXxgk6fk5O6'; // Number of hours
+const FLD_CL_NIVEAU     = 'fld2E7XYUsEBuPBPx'; // Niveau
+const FLD_CL_CHAPITRE   = 'fld3BmH3tWRI68Vsr'; // Chapitre en cours
+const FLD_CL_HORAIRES   = 'fldOT7CUfWymgpt6x'; // Horaires
+const FLD_CL_JOUR_TEXT  = 'fldBQEy5J44zTUtbJ'; // Jour (texte formaté, ex "lundi")
+const FLD_CL_DEBUTE     = 'fldRD4iUQikjM9IqI'; // Débute le
+const FLD_CL_TERMINE    = 'fldUWJz3lDU0ig83t'; // Se termine le
+const FLD_CL_STATUS     = 'fldwfIvxjy0RU9ske'; // Status
+const FLD_CL_STUDENTS   = 'fldFgC40O96SCnZnG'; // Students
+const FLD_CL_FICHE      = 'fldj3s3EI3Y1XkwNu'; // Fiche d'informations
+const TABLE_LIEUX       = 'tbl316ybnRhNr7SE0'; // table des lieux (liée à "Endroit")
+const FLD_LIEU_NAME     = 'fldgGz6R28tu630uz'; // nom affiché du lieu
+
+// Table "Gestion des absences"
+const TABLE_ABSENCES    = 'tblwISA3uDmqflwh4';
+const FLD_ABS_TEACHER   = 'fldCVfLoV3TXvTycH'; // Enseignant(e)
+const FLD_ABS_DATE      = 'fld1RZ9dTN84WyRhT'; // Date de l'absence
+const FLD_ABS_CLASSE    = 'fld4ydS6ZndZyDcAk'; // Classe de l'absence
+const FLD_ABS_MOTIF     = 'fldLGLrkDLTLd1voZ'; // Motif
+
 // Base RH — annuaire de l'équipe (vue "Photo Directory")
 const BASE_RH            = 'appDIFUhvkazrti2M';
 const TABLE_RH            = 'tblnL1EXuEFAABbfY';
@@ -242,12 +304,16 @@ const ALLOWED_DOMAIN    = 'oulpanlavi.com';
 let sentClasses = {};
 let annuaireLoaded = false;
 let annuaireLoading = false;
+let mesclassesLoaded = false;
+let mesclassesLoading = false;
+let absenceClassesLoaded = false;
+let absenceClassesLoading = false;
 let allClassesLight = null;
 let remplacementSelected = null;
 let sessionId = 0;          // incrémenté à chaque init/déconnexion : invalide les chargements en cours
 let classesLoading = false; // évite de relancer un chargement déjà en cours
 let classesLoaded = false;  // vrai une fois les classes chargées avec succès
-let state = { teacher: null, classes: [], students: {}, presences: {}, rapportRecords: {}, presenceRecordsToday: {}, presenceCache: {}, annuaire: [] };
+let state = { teacher: null, classes: [], students: {}, presences: {}, rapportRecords: {}, presenceRecordsToday: {}, presenceCache: {}, annuaire: [], mesclasses: [], absenceClasses: [] };
 
 // ── API ──
 async function api(base, table, params='', method='GET', body=null) {
@@ -276,7 +342,7 @@ async function getAll(base, table, params='') {
 // Active visuellement un onglet, sans déclencher de chargement
 function activateTabUI(name) {
   document.querySelectorAll('.tab-btn').forEach((b, i) => {
-    const names = ['sikkum', 'bakasha', 'presence', 'annuaire'];
+    const names = ['annuaire', 'mesclasses', 'presence', 'sikkum', 'points', 'absence', 'bakasha'];
     b.classList.toggle('active', names[i] === name);
   });
   document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
@@ -291,6 +357,12 @@ function switchTab(name) {
     renderBakasha();
   } else if (name === 'annuaire') {
     loadAnnuaire();
+  } else if (name === 'mesclasses') {
+    loadMesClasses();
+  } else if (name === 'points') {
+    renderPointsTab();
+  } else if (name === 'absence') {
+    renderAbsenceTab();
   } else if (!classesLoaded && !classesLoading) {
     loadClasses(name);
   }
@@ -334,10 +406,14 @@ function init() {
   classesLoaded = false;
   annuaireLoading = false;
   annuaireLoaded = false;
+  mesclassesLoading = false;
+  mesclassesLoaded = false;
+  absenceClassesLoading = false;
+  absenceClassesLoaded = false;
   sentClasses = {};
   allClassesLight = null;
   remplacementSelected = null;
-  state = { teacher: null, classes: [], students: {}, presences: {}, rapportRecords: {}, presenceRecordsToday: {}, presenceCache: {}, annuaire: [] };
+  state = { teacher: null, classes: [], students: {}, presences: {}, rapportRecords: {}, presenceRecordsToday: {}, presenceCache: {}, annuaire: [], mesclasses: [], absenceClasses: [] };
   renderHeaderDefault();
   hideTabs();
   renderLogin();
@@ -459,25 +535,40 @@ function renderWelcome() {
       <div class="welcome-name">שלום, ${state.teacher.name}! 👋</div>
       <div class="welcome-sub">Que souhaitez-vous faire aujourd'hui ?</div>
       <div class="welcome-cards">
-        <div class="welcome-card" onclick="openTab('sikkum')">
-          <div class="welcome-card-icon">📋</div>
-          <div class="welcome-card-title">דוח סיום שנה</div>
-          <div class="welcome-card-desc">Rapport de fin d'année — évaluations et bilan par classe</div>
+        <div class="welcome-card" onclick="openTab('annuaire')">
+          <div class="welcome-card-icon">👥</div>
+          <div class="welcome-card-title">אנשי צוות</div>
+          <div class="welcome-card-desc">Annuaire de l'équipe Oulpan Lavi</div>
+        </div>
+        <div class="welcome-card" onclick="openTab('mesclasses')">
+          <div class="welcome-card-icon">🏫</div>
+          <div class="welcome-card-title">הכיתות שלי</div>
+          <div class="welcome-card-desc">Détails complets de vos classes</div>
         </div>
         <div class="welcome-card" onclick="openTab('presence')">
           <div class="welcome-card-icon">✅</div>
           <div class="welcome-card-title">נוכחות</div>
           <div class="welcome-card-desc">Registre de présence — cocher les élèves présents</div>
         </div>
+        <div class="welcome-card" onclick="openTab('sikkum')">
+          <div class="welcome-card-icon">📋</div>
+          <div class="welcome-card-title">דוח סיום שנה</div>
+          <div class="welcome-card-desc">Rapport de fin d'année — évaluations et bilan par classe</div>
+        </div>
+        <div class="welcome-card" onclick="openTab('points')">
+          <div class="welcome-card-icon">🔑</div>
+          <div class="welcome-card-title">נקודות חשובות</div>
+          <div class="welcome-card-desc">Points importants et contacts utiles</div>
+        </div>
+        <div class="welcome-card" onclick="openTab('absence')">
+          <div class="welcome-card-icon">🤒</div>
+          <div class="welcome-card-title">דיווח היעדרות</div>
+          <div class="welcome-card-desc">Déclarer une absence</div>
+        </div>
         <div class="welcome-card" onclick="openTab('bakasha')">
           <div class="welcome-card-icon">📝</div>
           <div class="welcome-card-title">בקשות לשנה הבאה</div>
           <div class="welcome-card-desc">Vos préférences et demandes pour l'année 5787</div>
-        </div>
-        <div class="welcome-card" onclick="openTab('annuaire')">
-          <div class="welcome-card-icon">👥</div>
-          <div class="welcome-card-title">אנשי צוות</div>
-          <div class="welcome-card-desc">Annuaire de l'équipe Oulpan Lavi</div>
         </div>
       </div>
     </div>
@@ -491,6 +582,15 @@ async function openTab(tabName) {
   } else if (tabName === 'annuaire') {
     showTabs();
     switchTab('annuaire');
+  } else if (tabName === 'mesclasses') {
+    showTabs();
+    switchTab('mesclasses');
+  } else if (tabName === 'points') {
+    showTabs();
+    switchTab('points');
+  } else if (tabName === 'absence') {
+    showTabs();
+    switchTab('absence');
   } else if (!classesLoaded) {
     if (!classesLoading) await loadClasses(tabName);
   } else {
@@ -1248,6 +1348,284 @@ function renderAnnuaireTab(filterText) {
   if (input && filterText !== undefined) {
     input.focus();
     input.setSelectionRange(input.value.length, input.value.length);
+  }
+}
+
+// ── ONGLET 5 : VOS CLASSES ──
+let lieuxMap = null;
+
+async function loadLieuxMap() {
+  if (lieuxMap) return lieuxMap;
+  const recs = await getAll(BASE_COURS, TABLE_LIEUX, `?returnFieldsByFieldId=true`);
+  lieuxMap = {};
+  for (const r of recs) lieuxMap[r.id] = (r.fields[FLD_LIEU_NAME] || '').trim();
+  return lieuxMap;
+}
+
+function formatFrDate(iso) {
+  if (!iso) return '';
+  const parts = String(iso).split('-');
+  if (parts.length !== 3) return iso;
+  return `${parts[2]}/${parts[1]}/${parts[0]}`;
+}
+
+async function loadMesClasses() {
+  if (mesclassesLoaded || mesclassesLoading) { renderMesClassesTab(); return; }
+  if (!state.teacher || !state.teacher.classIds.length) {
+    setTab('mesclasses', `<div class="annuaire-empty">לא נמצאו כיתות</div>`);
+    return;
+  }
+  const mySession = sessionId;
+  mesclassesLoading = true;
+  setTab('mesclasses', `<div class="loading"><div class="spinner"></div><br>טוען את הכיתות שלך...</div>`);
+  try {
+    const lieux = await loadLieuxMap();
+    if (mySession !== sessionId) return;
+    const records = [];
+    for (let i = 0; i < state.teacher.classIds.length; i += 10) {
+      const batch = state.teacher.classIds.slice(i, i + 10);
+      const res = await api(BASE_COURS, TABLE_CLASSES, `?filterByFormula=${encodeURIComponent(`OR(${batch.map(id => `RECORD_ID()="${id}"`).join(',')})`)}&returnFieldsByFieldId=true`);
+      records.push(...(res.records || []));
+    }
+    if (mySession !== sessionId) return;
+    state.mesclasses = records.map(r => {
+      const f = r.fields;
+      const endroitIds = f[FLD_CL_ENDROIT] || [];
+      const endroitNames = endroitIds.map(id => lieux[id] || id).filter(Boolean);
+      const debute = (f[FLD_CL_DEBUTE] || [])[0];
+      const termine = (f[FLD_CL_TERMINE] || [])[0];
+      return {
+        id: r.id,
+        num: f[FLD_CL_NUM] || '',
+        autoId: f[FLD_CL_AUTOID] || '',
+        ancienne: f[FLD_CL_ANCIENNE] || '',
+        type: (f[FLD_CL_TYPE] && f[FLD_CL_TYPE].name) || '',
+        endroit: endroitNames.join(', '),
+        hours: f[FLD_CL_HOURS] != null ? f[FLD_CL_HOURS] : '',
+        niveau: (f[FLD_CL_NIVEAU] && f[FLD_CL_NIVEAU].name) || '',
+        chapitre: f[FLD_CL_CHAPITRE] || '',
+        jour: f[FLD_CL_JOUR_TEXT] || '',
+        horaires: f[FLD_CL_HORAIRES] || '',
+        debute: formatFrDate(debute),
+        termine: formatFrDate(termine),
+        status: (f[FLD_CL_STATUS] && f[FLD_CL_STATUS].name) || '',
+        studentsCount: (f[FLD_CL_STUDENTS] || []).length,
+        fiche: f[FLD_CL_FICHE] || ''
+      };
+    });
+    mesclassesLoaded = true;
+    renderMesClassesTab();
+  } catch (e) {
+    if (mySession === sessionId) setTab('mesclasses', `<div class="error-msg">Erreur : ${e.message}</div>`);
+  } finally {
+    if (mySession === sessionId) mesclassesLoading = false;
+  }
+}
+
+function statusCssClass(status) {
+  if (status === 'Complete') return 'complete';
+  if (status === 'In Progress') return 'inprogress';
+  if (status === 'Upcoming') return 'upcoming';
+  return 'creation';
+}
+
+function renderMesClassesTab() {
+  const list = state.mesclasses || [];
+  let html = `
+    <div class="prof-header">
+      <div>
+        <div class="prof-name">${state.teacher.name}</div>
+        <div class="prof-meta">הכיתות שלי • ${list.length} כיתה${list.length !== 1 ? 'ות' : ''}</div>
+      </div>
+    </div>`;
+
+  if (!list.length) {
+    html += `<div class="annuaire-empty">לא נמצאו כיתות</div>`;
+  } else {
+    html += `<div class="mesclasses-grid">`;
+    for (const c of list) {
+      html += `
+        <div class="mesclasses-card">
+          <div class="mesclasses-head">
+            <div class="mesclasses-title">כיתה ${c.num}</div>
+            <div class="mesclasses-autoid">${c.autoId}</div>
+          </div>
+          <div class="mesclasses-body">
+            <div class="mesclasses-row"><span class="mesclasses-row-label">Status</span><span class="mesclasses-status ${statusCssClass(c.status)}">${c.status || '—'}</span></div>
+            ${c.type ? `<div class="mesclasses-row"><span class="mesclasses-row-label">Type</span><span class="mesclasses-row-value">${c.type}</span></div>` : ''}
+            ${c.endroit ? `<div class="mesclasses-row"><span class="mesclasses-row-label">Endroit</span><span class="mesclasses-row-value">${c.endroit}</span></div>` : ''}
+            ${c.niveau ? `<div class="mesclasses-row"><span class="mesclasses-row-label">Niveau</span><span class="mesclasses-row-value">${c.niveau}</span></div>` : ''}
+            ${c.chapitre ? `<div class="mesclasses-row"><span class="mesclasses-row-label">Chapitre en cours</span><span class="mesclasses-row-value">${c.chapitre}</span></div>` : ''}
+            ${c.jour ? `<div class="mesclasses-row"><span class="mesclasses-row-label">Jour</span><span class="mesclasses-row-value">${c.jour}</span></div>` : ''}
+            ${c.horaires ? `<div class="mesclasses-row"><span class="mesclasses-row-label">Horaires</span><span class="mesclasses-row-value">${c.horaires}</span></div>` : ''}
+            <div class="mesclasses-row"><span class="mesclasses-row-label">Number of hours</span><span class="mesclasses-row-value">${c.hours}</span></div>
+            ${c.debute ? `<div class="mesclasses-row"><span class="mesclasses-row-label">Débute le</span><span class="mesclasses-row-value">${c.debute}</span></div>` : ''}
+            ${c.termine ? `<div class="mesclasses-row"><span class="mesclasses-row-label">Se termine le</span><span class="mesclasses-row-value">${c.termine}</span></div>` : ''}
+            <div class="mesclasses-row"><span class="mesclasses-row-label">Students</span><span class="mesclasses-row-value">${c.studentsCount}</span></div>
+            ${c.ancienne ? `<div class="mesclasses-row"><span class="mesclasses-row-label">Ancienne Classe</span><span class="mesclasses-row-value">${c.ancienne}</span></div>` : ''}
+            ${c.fiche ? `<a class="mesclasses-fiche" href="${c.fiche}" target="_blank" rel="noopener">📄 Fiche d'informations</a>` : ''}
+          </div>
+        </div>`;
+    }
+    html += `</div>`;
+  }
+  setTab('mesclasses', html);
+}
+
+// ── ONGLET 6 : POINTS IMPORTANTS ──
+function renderPointsTab() {
+  const html = `
+    <div class="card points-card">
+      <div class="points-title">🔑 Les points importants du prof</div>
+      <ul class="points-list">
+        <li>Une classe ne s'ouvre que si elle atteint le nombre minimum d'inscrits.</li>
+        <li>Les dates de début affichées sont donc indicatives tant que la classe n'est pas formée.</li>
+        <li>Une fois le nombre minimum d'inscrits atteint, vous recevrez un mail qui confirme cette fois la date de début de la classe.</li>
+        <li>Pour les classes Zoom, vous devez lancer la réunion qui porte le numéro de votre classe. Exemple : cliquez sur 101 pour lancer le cours de la classe 101.</li>
+        <li>Les liens d'enregistrement des cours Zoom sont automatiquement ajoutés à la "Fiche d'information des élèves".</li>
+        <li>Pensez à remplir la feuille de présence au début de chaque cours.</li>
+        <li>Si un élève n'apparaît pas dans la liste, prévenez Michal 😉.</li>
+        <li>Si vous avez un problème avec votre classe, contactez Michal 😉.</li>
+      </ul>
+      <div class="contact-subtitle">Qui contacter ?</div>
+      <div class="contact-table-wrap">
+        <table class="contact-table">
+          <thead><tr>
+            <th>Sujet</th>
+            <th>Responsable principal</th>
+            <th>Responsable secondaire</th>
+          </tr></thead>
+          <tbody>
+            <tr><td>Calendrier annuel (calendrier, horaires de cours, lieu des cours)</td><td>Michal</td><td>Yossi</td></tr>
+            <tr><td>Annulation de cours</td><td>Shai</td><td>Michal</td></tr>
+            <tr><td>Salaire, paiements, reporting</td><td>Yossi</td><td>-</td></tr>
+            <tr><td>Problèmes techniques en classe (Compte Zoom, clé de la classe, nettoyage, chauffage, tableau, projecteur, écran)</td><td>Michal</td><td>Yossi</td></tr>
+            <tr><td>Matériel pédagogique</td><td>Shai</td><td>-</td></tr>
+            <tr><td>Questions liées aux élèves</td><td>Michal</td><td>Yossi ou Shai</td></tr>
+            <tr><td>Changements majeurs ou problèmes importants</td><td>Yossi et/ou Shai</td><td>-</td></tr>
+            <tr><td>Idées pour de nouveaux projets</td><td>Yossi et/ou Shai</td><td>-</td></tr>
+            <tr><td>Changement dans la liste des élèves</td><td>Michal</td><td>-</td></tr>
+            <tr><td>Classes renouvelées, réinscriptions</td><td>Michal</td><td>-</td></tr>
+            <tr><td>Fiche de début de cours</td><td>Michal</td><td>-</td></tr>
+            <tr><td>Enregistrements des cours</td><td>Michal</td><td>-</td></tr>
+            <tr><td>Questions sur les livres</td><td>Yossi</td><td>Michal</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>`;
+  setTab('points', html);
+}
+
+// ── ONGLET 7 : DÉCLARER UNE ABSENCE ──
+async function loadAbsenceClasses() {
+  if (absenceClassesLoaded || absenceClassesLoading) return;
+  if (!state.teacher || !state.teacher.classIds.length) { absenceClassesLoaded = true; return; }
+  absenceClassesLoading = true;
+  try {
+    const records = [];
+    for (let i = 0; i < state.teacher.classIds.length; i += 10) {
+      const batch = state.teacher.classIds.slice(i, i + 10);
+      const res = await api(BASE_COURS, TABLE_CLASSES, `?filterByFormula=${encodeURIComponent(`OR(${batch.map(id => `RECORD_ID()="${id}"`).join(',')})`)}&returnFieldsByFieldId=true`);
+      records.push(...(res.records || []));
+    }
+    state.absenceClasses = records
+      .map(r => ({ id: r.id, num: r.fields[FLD_CL_NUM] || r.id }))
+      .sort((a, b) => String(a.num).localeCompare(String(b.num), 'fr', { numeric: true }));
+    absenceClassesLoaded = true;
+  } finally {
+    absenceClassesLoading = false;
+  }
+}
+
+async function renderAbsenceTab() {
+  setTab('absence', `<div class="loading"><div class="spinner"></div></div>`);
+  try {
+    await loadAbsenceClasses();
+  } catch (e) {
+    setTab('absence', `<div class="error-msg">Erreur : ${e.message}</div>`);
+    return;
+  }
+  buildAbsenceForm();
+}
+
+function buildAbsenceForm() {
+  const options = state.absenceClasses.map(c => `<option value="${c.id}">כיתה ${c.num}</option>`).join('');
+  const html = `
+    <div class="bakasha-card">
+      <div class="bakasha-title">דיווח היעדרות</div>
+      <div class="bakasha-sub">Déclarer une absence</div>
+      <div id="absence-error"></div>
+      <div class="bakasha-fields">
+
+        <div class="bakasha-field">
+          <label class="bakasha-label">Teacher</label>
+          <div class="bakasha-teacher-row">
+            <span class="bakasha-teacher-lock">🔒</span>
+            <span class="bakasha-teacher-email">${state.teacher.name}</span>
+          </div>
+        </div>
+
+        <div class="bakasha-field">
+          <label class="bakasha-label">תאריך ההיעדרות</label>
+          <input type="date" class="bakasha-input" id="abs-date" style="direction:ltr;" />
+        </div>
+
+        <div class="bakasha-field">
+          <label class="bakasha-label">כיתה</label>
+          ${state.absenceClasses.length ? `
+          <select class="bakasha-input" id="abs-classe" style="direction:ltr;">
+            <option value="">— בחר/י כיתה —</option>
+            ${options}
+          </select>` : `<div class="submit-class-note">לא נמצאו כיתות עבורך</div>`}
+        </div>
+
+        <div class="bakasha-field">
+          <label class="bakasha-label">סיבה</label>
+          <textarea class="bakasha-input" id="abs-motif" rows="3" placeholder="..."></textarea>
+        </div>
+
+      </div>
+      <div class="bakasha-submit-area">
+        <div class="bakasha-note">הנתונים יישמרו ב-Airtable</div>
+        <button class="btn-submit-bakasha" id="btn-absence" onclick="submitAbsence()" ${state.absenceClasses.length ? '' : 'disabled'}>✉ שליחה</button>
+      </div>
+    </div>`;
+  setTab('absence', html);
+}
+
+async function submitAbsence() {
+  const btn = document.getElementById('btn-absence');
+  const errDiv = document.getElementById('absence-error');
+  errDiv.innerHTML = '';
+
+  const dateStr = document.getElementById('abs-date')?.value || '';
+  const classeId = document.getElementById('abs-classe')?.value || '';
+  const motif = document.getElementById('abs-motif')?.value || '';
+
+  if (!dateStr) { errDiv.innerHTML = `<div class="error-msg">אנא בחר/י תאריך.</div>`; return; }
+  if (!classeId) { errDiv.innerHTML = `<div class="error-msg">אנא בחר/י כיתה.</div>`; return; }
+
+  btn.disabled = true; btn.textContent = 'שולח...';
+
+  const fields = {
+    [FLD_ABS_TEACHER]: [state.teacher.id],
+    [FLD_ABS_DATE]: dateStr,
+    [FLD_ABS_CLASSE]: [classeId],
+    [FLD_ABS_MOTIF]: motif
+  };
+
+  try {
+    await api(BASE_COURS, TABLE_ABSENCES, '', 'POST', { records: [{ fields }] });
+    document.getElementById('tab-absence').innerHTML = `
+      <div class="bakasha-card bakasha-success">
+        <div class="success-icon">✅</div>
+        <h2>ההיעדרות דווחה בהצלחה!</h2>
+        <p style="margin-top:8px;">תודה רבה, ${state.teacher.name}!</p>
+        <button class="btn-ghost" style="margin-top:1.5rem;" onclick="renderAbsenceTab()">📝 דיווח היעדרות נוספת</button>
+      </div>`;
+  } catch (e) {
+    btn.disabled = false; btn.textContent = '✉ שליחה';
+    errDiv.innerHTML = `<div class="error-msg">Erreur : ${e.message}</div>`;
   }
 }
 
