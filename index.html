@@ -233,7 +233,6 @@ const FLD_RH_EMAIL_PRO    = 'fldxrsp5qoh82YrQS';
 const FLD_RH_EMAIL_PERSO  = 'fldXZPw6L3rXhbQdm';
 const FLD_RH_STATUS       = 'fld3CnyNjQx1tCLJ2';
 const FLD_RH_PHOTO        = 'fld3UKG7ORMGHWbNu';
-const FLD_RH_ADDRESS      = 'fldSn8nGxEoLXa4X2';
 const FLD_RH_BOOKING      = 'fldXWjD6TAHKVWeP4';
 
 // ── GOOGLE AUTH ──
@@ -1189,7 +1188,6 @@ async function loadAnnuaire() {
         name: (f[FLD_RH_NAME] || '').trim(),
         role: (f[FLD_RH_ROLE] || '').trim(),
         city: (f[FLD_RH_CITY] || '').trim(),
-        address: (f[FLD_RH_ADDRESS] || '').trim(),
         phone: (f[FLD_RH_PHONE] || '').trim(),
         email: (f[FLD_RH_EMAIL_PRO] || f[FLD_RH_EMAIL_PERSO] || '').trim(),
         status: (f[FLD_RH_STATUS] && f[FLD_RH_STATUS].name) || '',
@@ -1237,7 +1235,6 @@ function renderAnnuaireTab(filterText) {
           <div class="annuaire-name">${p.name}</div>
           ${p.role ? `<div class="annuaire-role">${p.role}</div>` : ''}
           ${p.city ? `<div class="annuaire-meta">📍 ${p.city}</div>` : ''}
-          ${p.address ? `<div class="annuaire-meta">🏠 ${p.address}</div>` : ''}
           ${p.phone ? `<div class="annuaire-meta">📞 ${p.phone}</div>` : ''}
           ${p.email ? `<div class="annuaire-meta">✉️ ${p.email}</div>` : ''}
           <div class="annuaire-status ${statusClass}">${statusLabel}</div>
