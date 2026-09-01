@@ -216,13 +216,13 @@ table.contact-table { width: 100%; border-collapse: collapse; font-size: 12.5px;
     </div>
   </div>
   <div id="tabs-bar" class="tabs-bar" style="display:none;">
-    <button class="tab-btn active" onclick="switchTab('sikkum')">📋 דוח סיום שנה</button>
-    <button class="tab-btn" onclick="switchTab('bakasha')">📝 בקשות לשנה הבאה</button>
-    <button class="tab-btn" onclick="switchTab('presence')">✅ נוכחות</button>
-    <button class="tab-btn" onclick="switchTab('annuaire')">👥 אנשי צוות</button>
+    <button class="tab-btn active" onclick="switchTab('annuaire')">👥 אנשי צוות</button>
     <button class="tab-btn" onclick="switchTab('mesclasses')">🏫 הכיתות שלי</button>
+    <button class="tab-btn" onclick="switchTab('presence')">✅ נוכחות</button>
+    <button class="tab-btn" onclick="switchTab('sikkum')">📋 דוח סיום שנה</button>
     <button class="tab-btn" onclick="switchTab('points')">🔑 נקודות חשובות</button>
     <button class="tab-btn" onclick="switchTab('absence')">🤒 דיווח היעדרות</button>
+    <button class="tab-btn" onclick="switchTab('bakasha')">📝 בקשות לשנה הבאה</button>
   </div>
   <div class="content">
     <div id="root"></div>
@@ -342,7 +342,7 @@ async function getAll(base, table, params='') {
 // Active visuellement un onglet, sans déclencher de chargement
 function activateTabUI(name) {
   document.querySelectorAll('.tab-btn').forEach((b, i) => {
-    const names = ['sikkum', 'bakasha', 'presence', 'annuaire', 'mesclasses', 'points', 'absence'];
+    const names = ['annuaire', 'mesclasses', 'presence', 'sikkum', 'points', 'absence', 'bakasha'];
     b.classList.toggle('active', names[i] === name);
   });
   document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
