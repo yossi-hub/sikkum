@@ -1509,9 +1509,11 @@ function renderPointsTab() {
 
 // ── ONGLET 7 : DÉCLARER UNE ABSENCE ──
 function renderAbsenceTab() {
+  const teacherName = encodeURIComponent(state.teacher.name);
+  const src = `https://airtable.com/embed/appNbwmEyVQsXA25U/pagQF1WXvE4wODHqf/form?prefill_Enseignant(e)=${teacherName}&hide_Enseignant(e)=true`;
   const html = `
     <div class="absence-wrap">
-      <iframe class="absence-embed airtable-embed" src="https://airtable.com/embed/appNbwmEyVQsXA25U/pagQF1WXvE4wODHqf/form" frameborder="0" onmousewheel="" width="100%" height="533" style="background: transparent; border: 1px solid #ccc;"></iframe>
+      <iframe class="absence-embed airtable-embed" src="${src}" frameborder="0" onmousewheel="" width="100%" height="533" style="background: transparent; border: 1px solid #ccc;"></iframe>
     </div>`;
   setTab('absence', html);
 }
