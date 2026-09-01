@@ -1189,7 +1189,7 @@ async function loadAnnuaire() {
         status: (f[FLD_RH_STATUS] && f[FLD_RH_STATUS].name) || '',
         photoUrl: photo ? (photo.thumbnails?.large?.url || photo.url) : null
       };
-    }).sort((a, b) => a.name.localeCompare(b.name, 'fr'));
+    });
     annuaireLoaded = true;
     renderAnnuaireTab();
   } catch (e) {
