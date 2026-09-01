@@ -535,21 +535,6 @@ function renderWelcome() {
       <div class="welcome-name">שלום, ${state.teacher.name}! 👋</div>
       <div class="welcome-sub">Que souhaitez-vous faire aujourd'hui ?</div>
       <div class="welcome-cards">
-        <div class="welcome-card" onclick="openTab('sikkum')">
-          <div class="welcome-card-icon">📋</div>
-          <div class="welcome-card-title">דוח סיום שנה</div>
-          <div class="welcome-card-desc">Rapport de fin d'année — évaluations et bilan par classe</div>
-        </div>
-        <div class="welcome-card" onclick="openTab('presence')">
-          <div class="welcome-card-icon">✅</div>
-          <div class="welcome-card-title">נוכחות</div>
-          <div class="welcome-card-desc">Registre de présence — cocher les élèves présents</div>
-        </div>
-        <div class="welcome-card" onclick="openTab('bakasha')">
-          <div class="welcome-card-icon">📝</div>
-          <div class="welcome-card-title">בקשות לשנה הבאה</div>
-          <div class="welcome-card-desc">Vos préférences et demandes pour l'année 5787</div>
-        </div>
         <div class="welcome-card" onclick="openTab('annuaire')">
           <div class="welcome-card-icon">👥</div>
           <div class="welcome-card-title">אנשי צוות</div>
@@ -560,6 +545,16 @@ function renderWelcome() {
           <div class="welcome-card-title">הכיתות שלי</div>
           <div class="welcome-card-desc">Détails complets de vos classes</div>
         </div>
+        <div class="welcome-card" onclick="openTab('presence')">
+          <div class="welcome-card-icon">✅</div>
+          <div class="welcome-card-title">נוכחות</div>
+          <div class="welcome-card-desc">Registre de présence — cocher les élèves présents</div>
+        </div>
+        <div class="welcome-card" onclick="openTab('sikkum')">
+          <div class="welcome-card-icon">📋</div>
+          <div class="welcome-card-title">דוח סיום שנה</div>
+          <div class="welcome-card-desc">Rapport de fin d'année — évaluations et bilan par classe</div>
+        </div>
         <div class="welcome-card" onclick="openTab('points')">
           <div class="welcome-card-icon">🔑</div>
           <div class="welcome-card-title">נקודות חשובות</div>
@@ -569,6 +564,11 @@ function renderWelcome() {
           <div class="welcome-card-icon">🤒</div>
           <div class="welcome-card-title">דיווח היעדרות</div>
           <div class="welcome-card-desc">Déclarer une absence</div>
+        </div>
+        <div class="welcome-card" onclick="openTab('bakasha')">
+          <div class="welcome-card-icon">📝</div>
+          <div class="welcome-card-title">בקשות לשנה הבאה</div>
+          <div class="welcome-card-desc">Vos préférences et demandes pour l'année 5787</div>
         </div>
       </div>
     </div>
