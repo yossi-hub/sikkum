@@ -181,8 +181,6 @@ table.contact-table { width: 100%; border-collapse: collapse; font-size: 12.5px;
 .contact-table th { padding: 8px 12px; font-weight: 600; color: #888; text-align: left; background: #f5f2ee; border-bottom: 0.5px solid rgba(2,93,184,0.1); white-space: nowrap; }
 .contact-table td { padding: 8px 12px; border-bottom: 0.5px solid rgba(2,93,184,0.07); color: #2e2e2e; }
 .contact-table tr:last-child td { border-bottom: none; }
-.absence-wrap { max-width: 660px; margin: 0 auto; }
-.absence-embed { width: 100%; min-height: 533px; border: none; background: transparent; border-radius: 12px; }
 
 @media (max-width: 680px) { .welcome-cards { grid-template-columns: 1fr; } }
 
@@ -278,6 +276,13 @@ const FLD_CL_FICHE      = 'fldj3s3EI3Y1XkwNu'; // Fiche d'informations
 const TABLE_LIEUX       = 'tbl316ybnRhNr7SE0'; // table des lieux (liée à "Endroit")
 const FLD_LIEU_NAME     = 'fldgGz6R28tu630uz'; // nom affiché du lieu
 
+// Table "Gestion des absences"
+const TABLE_ABSENCES    = 'tblwISA3uDmqflwh4';
+const FLD_ABS_TEACHER   = 'fldCVfLoV3TXvTycH'; // Enseignant(e)
+const FLD_ABS_DATE      = 'fld1RZ9dTN84WyRhT'; // Date de l'absence
+const FLD_ABS_CLASSE    = 'fld4ydS6ZndZyDcAk'; // Classe de l'absence
+const FLD_ABS_MOTIF     = 'fldLGLrkDLTLd1voZ'; // Motif
+
 // Base RH — annuaire de l'équipe (vue "Photo Directory")
 const BASE_RH            = 'appDIFUhvkazrti2M';
 const TABLE_RH            = 'tblnL1EXuEFAABbfY';
@@ -301,12 +306,14 @@ let annuaireLoaded = false;
 let annuaireLoading = false;
 let mesclassesLoaded = false;
 let mesclassesLoading = false;
+let absenceClassesLoaded = false;
+let absenceClassesLoading = false;
 let allClassesLight = null;
 let remplacementSelected = null;
 let sessionId = 0;          // incrémenté à chaque init/déconnexion : invalide les chargements en cours
 let classesLoading = false; // évite de relancer un chargement déjà en cours
 let classesLoaded = false;  // vrai une fois les classes chargées avec succès
-let state = { teacher: null, classes: [], students: {}, presences: {}, rapportRecords: {}, presenceRecordsToday: {}, presenceCache: {}, annuaire: [], mesclasses: [] };
+let state = { teacher: null, classes: [], students: {}, presences: {}, rapportRecords: {}, presenceRecordsToday: {}, presenceCache: {}, annuaire: [], mesclasses: [], absenceClasses: [] };
 
 // ── API ──
 async function api(base, table, params='', method='GET', body=null) {
@@ -401,10 +408,12 @@ function init() {
   annuaireLoaded = false;
   mesclassesLoading = false;
   mesclassesLoaded = false;
+  absenceClassesLoading = false;
+  absenceClassesLoaded = false;
   sentClasses = {};
   allClassesLight = null;
   remplacementSelected = null;
-  state = { teacher: null, classes: [], students: {}, presences: {}, rapportRecords: {}, presenceRecordsToday: {}, presenceCache: {}, annuaire: [], mesclasses: [] };
+  state = { teacher: null, classes: [], students: {}, presences: {}, rapportRecords: {}, presenceRecordsToday: {}, presenceCache: {}, annuaire: [], mesclasses: [], absenceClasses: [] };
   renderHeaderDefault();
   hideTabs();
   renderLogin();
@@ -1508,14 +1517,116 @@ function renderPointsTab() {
 }
 
 // ── ONGLET 7 : DÉCLARER UNE ABSENCE ──
-function renderAbsenceTab() {
-  const teacherName = encodeURIComponent(state.teacher.name);
-  const src = `https://airtable.com/embed/appNbwmEyVQsXA25U/pagQF1WXvE4wODHqf/form?prefill_Enseignant(e)=${teacherName}&hide_Enseignant(e)=true`;
+async function loadAbsenceClasses() {
+  if (absenceClassesLoaded || absenceClassesLoading) return;
+  if (!state.teacher || !state.teacher.classIds.length) { absenceClassesLoaded = true; return; }
+  absenceClassesLoading = true;
+  try {
+    const records = [];
+    for (let i = 0; i < state.teacher.classIds.length; i += 10) {
+      const batch = state.teacher.classIds.slice(i, i + 10);
+      const res = await api(BASE_COURS, TABLE_CLASSES, `?filterByFormula=${encodeURIComponent(`OR(${batch.map(id => `RECORD_ID()="${id}"`).join(',')})`)}&returnFieldsByFieldId=true`);
+      records.push(...(res.records || []));
+    }
+    state.absenceClasses = records
+      .map(r => ({ id: r.id, num: r.fields[FLD_CL_NUM] || r.id }))
+      .sort((a, b) => String(a.num).localeCompare(String(b.num), 'fr', { numeric: true }));
+    absenceClassesLoaded = true;
+  } finally {
+    absenceClassesLoading = false;
+  }
+}
+
+async function renderAbsenceTab() {
+  setTab('absence', `<div class="loading"><div class="spinner"></div></div>`);
+  try {
+    await loadAbsenceClasses();
+  } catch (e) {
+    setTab('absence', `<div class="error-msg">Erreur : ${e.message}</div>`);
+    return;
+  }
+  buildAbsenceForm();
+}
+
+function buildAbsenceForm() {
+  const options = state.absenceClasses.map(c => `<option value="${c.id}">כיתה ${c.num}</option>`).join('');
   const html = `
-    <div class="absence-wrap">
-      <iframe class="absence-embed airtable-embed" src="${src}" frameborder="0" onmousewheel="" width="100%" height="533" style="background: transparent; border: 1px solid #ccc;"></iframe>
+    <div class="bakasha-card">
+      <div class="bakasha-title">דיווח היעדרות</div>
+      <div class="bakasha-sub">Déclarer une absence</div>
+      <div id="absence-error"></div>
+      <div class="bakasha-fields">
+
+        <div class="bakasha-field">
+          <label class="bakasha-label">Teacher</label>
+          <div class="bakasha-teacher-row">
+            <span class="bakasha-teacher-lock">🔒</span>
+            <span class="bakasha-teacher-email">${state.teacher.name}</span>
+          </div>
+        </div>
+
+        <div class="bakasha-field">
+          <label class="bakasha-label">תאריך ההיעדרות</label>
+          <input type="date" class="bakasha-input" id="abs-date" style="direction:ltr;" />
+        </div>
+
+        <div class="bakasha-field">
+          <label class="bakasha-label">כיתה</label>
+          ${state.absenceClasses.length ? `
+          <select class="bakasha-input" id="abs-classe" style="direction:ltr;">
+            <option value="">— בחר/י כיתה —</option>
+            ${options}
+          </select>` : `<div class="submit-class-note">לא נמצאו כיתות עבורך</div>`}
+        </div>
+
+        <div class="bakasha-field">
+          <label class="bakasha-label">סיבה</label>
+          <textarea class="bakasha-input" id="abs-motif" rows="3" placeholder="..."></textarea>
+        </div>
+
+      </div>
+      <div class="bakasha-submit-area">
+        <div class="bakasha-note">הנתונים יישמרו ב-Airtable</div>
+        <button class="btn-submit-bakasha" id="btn-absence" onclick="submitAbsence()" ${state.absenceClasses.length ? '' : 'disabled'}>✉ שליחה</button>
+      </div>
     </div>`;
   setTab('absence', html);
+}
+
+async function submitAbsence() {
+  const btn = document.getElementById('btn-absence');
+  const errDiv = document.getElementById('absence-error');
+  errDiv.innerHTML = '';
+
+  const dateStr = document.getElementById('abs-date')?.value || '';
+  const classeId = document.getElementById('abs-classe')?.value || '';
+  const motif = document.getElementById('abs-motif')?.value || '';
+
+  if (!dateStr) { errDiv.innerHTML = `<div class="error-msg">אנא בחר/י תאריך.</div>`; return; }
+  if (!classeId) { errDiv.innerHTML = `<div class="error-msg">אנא בחר/י כיתה.</div>`; return; }
+
+  btn.disabled = true; btn.textContent = 'שולח...';
+
+  const fields = {
+    [FLD_ABS_TEACHER]: [state.teacher.id],
+    [FLD_ABS_DATE]: dateStr,
+    [FLD_ABS_CLASSE]: [classeId],
+    [FLD_ABS_MOTIF]: motif
+  };
+
+  try {
+    await api(BASE_COURS, TABLE_ABSENCES, '', 'POST', { records: [{ fields }] });
+    document.getElementById('tab-absence').innerHTML = `
+      <div class="bakasha-card bakasha-success">
+        <div class="success-icon">✅</div>
+        <h2>ההיעדרות דווחה בהצלחה!</h2>
+        <p style="margin-top:8px;">תודה רבה, ${state.teacher.name}!</p>
+        <button class="btn-ghost" style="margin-top:1.5rem;" onclick="renderAbsenceTab()">📝 דיווח היעדרות נוספת</button>
+      </div>`;
+  } catch (e) {
+    btn.disabled = false; btn.textContent = '✉ שליחה';
+    errDiv.innerHTML = `<div class="error-msg">Erreur : ${e.message}</div>`;
+  }
 }
 
 // ── ONGLET 2 : BAKASHA ──
