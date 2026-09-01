@@ -256,6 +256,8 @@ const FLD_PRES_CLASSE  = 'fldVLXXtLgaVuEwAo'; // Classes (texte, numéro de clas
 const FLD_PRES_DATE    = 'fldMOUWRqgoR0rYe7'; // Date (dateTime)
 const FLD_PRES_PRESENT = 'fld6XD60QTpapL0Jq'; // Présente (checkbox)
 const FLD_PRES_PROF    = 'fldS9wwl4L5TtJ44z'; // Prof (texte, nom de la personne qui a rempli)
+const FLD_PRES_CHAPITRE = 'flds4EL8IOmAg52LK'; // Chapitre
+const FLD_PRES_LECON    = 'fldepIP0jRgERjfZW'; // מס' שיעור ושקופית במצגת
 
 // Champs additionnels de TABLE_CLASSES pour l'onglet "Vos classes"
 const FLD_CL_NUM        = 'fldcKQPOroEmSYmwE'; // Numéro de classe
@@ -313,7 +315,7 @@ let remplacementSelected = null;
 let sessionId = 0;          // incrémenté à chaque init/déconnexion : invalide les chargements en cours
 let classesLoading = false; // évite de relancer un chargement déjà en cours
 let classesLoaded = false;  // vrai une fois les classes chargées avec succès
-let state = { teacher: null, classes: [], students: {}, presences: {}, rapportRecords: {}, presenceRecordsToday: {}, presenceCache: {}, annuaire: [], mesclasses: [], absenceClasses: [] };
+let state = { teacher: null, classes: [], students: {}, presences: {}, rapportRecords: {}, presenceRecordsToday: {}, presenceCache: {}, presenceMeta: {}, annuaire: [], mesclasses: [], absenceClasses: [] };
 
 // ── API ──
 async function api(base, table, params='', method='GET', body=null) {
@@ -413,7 +415,7 @@ function init() {
   sentClasses = {};
   allClassesLight = null;
   remplacementSelected = null;
-  state = { teacher: null, classes: [], students: {}, presences: {}, rapportRecords: {}, presenceRecordsToday: {}, presenceCache: {}, annuaire: [], mesclasses: [], absenceClasses: [] };
+  state = { teacher: null, classes: [], students: {}, presences: {}, rapportRecords: {}, presenceRecordsToday: {}, presenceCache: {}, presenceMeta: {}, annuaire: [], mesclasses: [], absenceClasses: [] };
   renderHeaderDefault();
   hideTabs();
   renderLogin();
@@ -673,6 +675,7 @@ async function loadClasses(targetTab) {
     if (mySession !== sessionId) return;
     loading('Vérification des présences du jour...');
     state.presenceRecordsToday = {};
+    state.presenceMeta = {};
     const todayStr = getTodayStr();
     if (state.classes.length) {
       const orParts = state.classes.map(c => `{Classes}="${String(c.num).replace(/"/g,'\\"')}"`).join(',');
@@ -688,6 +691,12 @@ async function loadClasses(targetTab) {
         if (!sid) continue;
         if (!state.presenceRecordsToday[classId]) state.presenceRecordsToday[classId] = {};
         state.presenceRecordsToday[classId][sid] = { recordId: r.id, present: !!r.fields[FLD_PRES_PRESENT] };
+        if (!state.presenceMeta[classId]) {
+          state.presenceMeta[classId] = {
+            chapitre: r.fields[FLD_PRES_CHAPITRE] != null ? r.fields[FLD_PRES_CHAPITRE] : '',
+            lecon: r.fields[FLD_PRES_LECON] || ''
+          };
+        }
       }
     }
 
@@ -976,6 +985,7 @@ function buildPresenceHtml() {
 
   state.classes.forEach((cls, idx) => {
     const existingMap = state.presenceRecordsToday[cls.id] || {};
+    const meta = state.presenceMeta[cls.id] || { chapitre: '', lecon: '' };
     state.presenceCache[cls.id] = { dateStr: todayStr, existingMap };
     const doneToday = Object.keys(existingMap).length > 0;
     const isOpen = idx === 0;
@@ -993,9 +1003,19 @@ function buildPresenceHtml() {
       </div>
       <div class="classe-body">
         <div class="infos-classe">
-          <div class="field-group" style="max-width:200px;">
-            <label class="field-label">תאריך</label>
-            <input type="date" class="field-input" id="pres-date-${cls.id}" value="${todayStr}" onchange="onPresenceDateChange('${cls.id}')" />
+          <div class="infos-grid">
+            <div class="field-group" style="max-width:200px;">
+              <label class="field-label">תאריך</label>
+              <input type="date" class="field-input" id="pres-date-${cls.id}" value="${todayStr}" onchange="onPresenceDateChange('${cls.id}')" />
+            </div>
+            <div class="field-group" style="max-width:140px;">
+              <label class="field-label">פרק</label>
+              <input type="number" class="field-input" id="pres-chapitre-${cls.id}" value="${meta.chapitre !== '' ? meta.chapitre : ''}" step="0.1" style="direction:ltr;" />
+            </div>
+            <div class="field-group infos-full">
+              <label class="field-label">מס' שיעור ושקופית במצגת</label>
+              <input type="text" class="field-input" id="pres-lecon-${cls.id}" value="${meta.lecon || ''}" placeholder="לדוגמה: שיעור 5, שקופית 12" />
+            </div>
           </div>
         </div>
         <div id="pres-error-${cls.id}"></div>
@@ -1033,9 +1053,11 @@ async function loadAndRenderPresenceChecklist(classId, dateStr) {
   if (listEl) listEl.innerHTML = `<div class="loading" style="padding:1rem;"><div class="spinner"></div></div>`;
 
   let existingMap = {};
+  let meta = { chapitre: '', lecon: '' };
   const todayStr = getTodayStr();
   if (dateStr === todayStr && state.presenceRecordsToday[classId]) {
     existingMap = state.presenceRecordsToday[classId];
+    meta = state.presenceMeta[classId] || meta;
   } else {
     try {
       const formula = encodeURIComponent(`AND({Classes}="${String(cls.num).replace(/"/g,'\\"')}",IS_SAME({Date},"${dateStr}",'day'))`);
@@ -1044,11 +1066,23 @@ async function loadAndRenderPresenceChecklist(classId, dateStr) {
         const sid = (r.fields[FLD_PRES_ELEVE] || [])[0];
         if (sid) existingMap[sid] = { recordId: r.id, present: !!r.fields[FLD_PRES_PRESENT] };
       }
+      if (recs.length) {
+        meta = {
+          chapitre: recs[0].fields[FLD_PRES_CHAPITRE] != null ? recs[0].fields[FLD_PRES_CHAPITRE] : '',
+          lecon: recs[0].fields[FLD_PRES_LECON] || ''
+        };
+      }
     } catch (e) {
       const errEl = document.getElementById(`pres-error-${classId}`);
       if (errEl) errEl.innerHTML = `<div class="error-msg">Erreur : ${e.message}</div>`;
     }
   }
+
+  state.presenceMeta[classId] = meta;
+  const chapitreEl = document.getElementById(`pres-chapitre-${classId}`);
+  if (chapitreEl) chapitreEl.value = meta.chapitre !== '' ? meta.chapitre : '';
+  const leconEl = document.getElementById(`pres-lecon-${classId}`);
+  if (leconEl) leconEl.value = meta.lecon || '';
 
   state.presenceCache[classId] = { dateStr, existingMap };
   if (listEl) listEl.innerHTML = buildStudentChecklist(cls, existingMap);
@@ -1067,6 +1101,9 @@ async function submitPresence(classId) {
   if (btn) { btn.disabled = true; btn.textContent = 'שומר...'; }
 
   const isoDate = `${dateStr}T12:00:00.000Z`;
+  const chapitreRaw = document.getElementById(`pres-chapitre-${classId}`)?.value;
+  const chapitreVal = chapitreRaw !== undefined && chapitreRaw !== '' ? parseFloat(chapitreRaw) : null;
+  const leconVal = document.getElementById(`pres-lecon-${classId}`)?.value || '';
   const toCreate = [], toUpdate = [];
   for (const sid of cls.studentIds) {
     const checkEl = document.getElementById(`pc-${classId}-${sid}`);
@@ -1076,7 +1113,9 @@ async function submitPresence(classId) {
       [FLD_PRES_CLASSE]: cls.num,
       [FLD_PRES_DATE]: isoDate,
       [FLD_PRES_PRESENT]: checkEl.checked,
-      [FLD_PRES_PROF]: state.teacher.name
+      [FLD_PRES_PROF]: state.teacher.name,
+      [FLD_PRES_CHAPITRE]: chapitreVal,
+      [FLD_PRES_LECON]: leconVal
     };
     const existing = existingMap[sid];
     if (existing) toUpdate.push({ id: existing.recordId, fields });
@@ -1093,6 +1132,7 @@ async function submitPresence(classId) {
     await loadAndRenderPresenceChecklist(classId, dateStr);
     if (dateStr === getTodayStr()) {
       state.presenceRecordsToday[classId] = state.presenceCache[classId].existingMap;
+      state.presenceMeta[classId] = { chapitre: chapitreVal != null ? chapitreVal : '', lecon: leconVal };
       const block = document.getElementById(`presblock-${classId}`);
       if (block) block.classList.add('sent');
     }
