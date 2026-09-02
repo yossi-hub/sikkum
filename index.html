@@ -97,11 +97,11 @@ select.passage:focus { outline: none; border-color: #025db8; }
 
 /* ── ONGLET 3 : נוכחות (présence) ── */
 .pres-students { display: flex; flex-direction: column; }
-.pres-row-wrap { border-bottom: 0.5px solid rgba(2,93,184,0.07); padding: 4px 0; }
+.pres-row-wrap { display: flex; align-items: center; gap: 10px; padding: 6px 4px; border-bottom: 0.5px solid rgba(2,93,184,0.07); flex-wrap: wrap; }
 .pres-row-wrap:last-child { border-bottom: none; }
-.pres-row { display: flex; align-items: center; gap: 10px; padding: 4px 4px; font-size: 14px; color: #2e2e2e; cursor: pointer; }
+.pres-row { display: flex; align-items: center; gap: 8px; font-size: 14px; color: #2e2e2e; cursor: pointer; flex-shrink: 0; min-width: 140px; }
 .pres-row input[type=checkbox] { width: 18px; height: 18px; accent-color: #025db8; cursor: pointer; flex-shrink: 0; }
-.pres-motif { margin: 4px 4px 6px 4px; width: calc(100% - 8px); font-size: 12.5px; }
+.pres-motif { flex: 1; min-width: 140px; font-size: 12.5px; padding: 6px 8px; margin: 0; }
 
 /* ── ONGLET 2 : BAKASHA ── */
 .bakasha-card { background: #FFF9F2; border: 0.5px solid rgba(2,93,184,0.15); border-radius: 12px; padding: 2rem 1.75rem; max-width: 680px; margin: 0 auto; }
@@ -969,7 +969,7 @@ function buildStudentChecklist(cls, existingMap) {
     html += `
       <div class="pres-row-wrap">
         <label class="pres-row"><input type="checkbox" class="pres-check" id="pc-${cls.id}-${sid}" onchange="toggleMotifField('${cls.id}','${sid}')" ${checked ? 'checked' : ''} /> <span>${name}</span></label>
-        <input type="text" class="field-input pres-motif" id="pm-${cls.id}-${sid}" placeholder="סיבת ההיעדרות..." value="${motif}" style="display:${checked ? 'none' : 'block'};" />
+        <input type="text" class="field-input pres-motif" id="pm-${cls.id}-${sid}" placeholder="סיבת היעדרות" value="${motif}" style="display:${checked ? 'none' : 'inline-block'};" />
       </div>`;
   }
   html += '</div>';
@@ -979,7 +979,7 @@ function buildStudentChecklist(cls, existingMap) {
 function toggleMotifField(classId, sid) {
   const checkEl = document.getElementById(`pc-${classId}-${sid}`);
   const motifEl = document.getElementById(`pm-${classId}-${sid}`);
-  if (checkEl && motifEl) motifEl.style.display = checkEl.checked ? 'none' : 'block';
+  if (checkEl && motifEl) motifEl.style.display = checkEl.checked ? 'none' : 'inline-block';
 }
 
 function renderPresenceTab() {
