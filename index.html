@@ -744,7 +744,7 @@ function buildSikkumHtml() {
     <div class="prof-header">
       <div>
         <div class="prof-name">${t.name}</div>
-        <div class="prof-meta">${state.classes.length} כיתה${state.classes.length!==1?'ות':''} • שנת 5786</div>
+        <div class="prof-meta">${state.classes.length} ${state.classes.length !== 1 ? 'כיתות' : 'כיתה'} • שנת 5786</div>
       </div>
     </div>`;
 
@@ -979,7 +979,7 @@ function buildPresenceHtml() {
     <div class="prof-header">
       <div>
         <div class="prof-name">${t.name}</div>
-        <div class="prof-meta">רישום נוכחות • ${state.classes.length} כיתה${state.classes.length !== 1 ? 'ות' : ''}</div>
+        <div class="prof-meta">רישום נוכחות • ${state.classes.length} ${state.classes.length !== 1 ? 'כיתות' : 'כיתה'}</div>
       </div>
     </div>`;
 
@@ -1475,7 +1475,7 @@ function renderMesClassesTab() {
     <div class="prof-header">
       <div>
         <div class="prof-name">${state.teacher.name}</div>
-        <div class="prof-meta">הכיתות שלי • ${list.length} כיתה${list.length !== 1 ? 'ות' : ''}</div>
+        <div class="prof-meta">הכיתות שלי • ${list.length} ${list.length !== 1 ? 'כיתות' : 'כיתה'}</div>
       </div>
     </div>`;
 
