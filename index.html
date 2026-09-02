@@ -635,7 +635,7 @@ async function loadClasses(targetTab) {
       const cls = await api(BASE_COURS, TABLE_CLASSES, `/${cid}`);
       const f = cls.fields;
       if (!['Complete', 'In Progress'].includes(f['Status'])) continue;
-      state.classes.push({ id: cid, num: f['Numéro de Classe'] || f['Name'] || cid, chapitre: f['Chapitre en cours'] || '', niveau: f['Niveau'] || '', studentIds: f['Students'] || [] });
+      state.classes.push({ id: cid, num: f['Numéro de Classe'] || f['Name'] || cid, chapitre: f['Chapitre en cours'] || '', niveau: f['Niveau'] || '', studentIds: f['Students'] || [], status: f['Status'] || '' });
     }
     const allStudentIds = [...new Set(state.classes.flatMap(c => c.studentIds))];
     for (let i = 0; i < allStudentIds.length; i += 10) {
@@ -989,15 +989,16 @@ function renderPresenceTab() {
 function buildPresenceHtml() {
   const t = state.teacher;
   const todayStr = getTodayStr();
+  const activeClasses = state.classes.filter(c => c.status !== 'Complete');
   let html = `
     <div class="prof-header">
       <div>
         <div class="prof-name">${t.name}</div>
-        <div class="prof-meta">רישום נוכחות • ${state.classes.length} ${state.classes.length !== 1 ? 'כיתות' : 'כיתה'}</div>
+        <div class="prof-meta">רישום נוכחות • ${activeClasses.length} ${activeClasses.length !== 1 ? 'כיתות' : 'כיתה'}</div>
       </div>
     </div>`;
 
-  state.classes.forEach((cls, idx) => {
+  activeClasses.forEach((cls, idx) => {
     const existingMap = state.presenceRecordsToday[cls.id] || {};
     const meta = state.presenceMeta[cls.id] || { chapitre: '', lecon: '' };
     state.presenceCache[cls.id] = { dateStr: todayStr, existingMap };
