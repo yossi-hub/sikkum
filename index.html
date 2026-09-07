@@ -43,6 +43,13 @@ body { font-family: 'Poppins', -apple-system, sans-serif; background: #f0ede8; c
 .dev-banner { background: #f8cf3e; color: #2e2e2e; border-radius: 8px; padding: 8px 12px; font-size: 12px; font-weight: 500; margin-bottom: 1rem; direction: ltr; }
 .btn-logout { padding: 5px 12px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.3); background: transparent; color: rgba(255,255,255,0.85); font-family: 'Poppins', sans-serif; font-size: 12px; cursor: pointer; transition: background .15s; white-space: nowrap; }
 .btn-logout:hover { background: rgba(255,255,255,0.12); }
+.admin-badge { background: #f8cf3e; color: #2e2e2e; border-radius: 20px; font-size: 11px; font-weight: 700; padding: 3px 10px; white-space: nowrap; }
+.admin-teacher-list { max-height: 380px; overflow-y: auto; border-radius: 8px; border: 0.5px solid rgba(2,93,184,0.15); direction: rtl; }
+.admin-teacher-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 14px; border-bottom: 0.5px solid rgba(2,93,184,0.08); cursor: pointer; transition: background .15s; }
+.admin-teacher-row:last-child { border-bottom: none; }
+.admin-teacher-row:hover { background: rgba(2,93,184,0.06); }
+.admin-teacher-name { font-size: 14px; font-weight: 600; color: #2e2e2e; }
+.admin-teacher-email { font-size: 12px; color: #888; direction: ltr; }
 .btn-ghost { padding: 8px 16px; border-radius: 8px; border: 0.5px solid rgba(2,93,184,0.3); background: transparent; color: #025db8; font-family: 'Poppins', sans-serif; font-size: 13px; cursor: pointer; }
 .btn-ghost:hover { background: rgba(2,93,184,0.05); }
 
@@ -172,6 +179,11 @@ textarea.bakasha-input { min-height: 80px; resize: vertical; }
 .mesclasses-status.creation { background: #eee; color: #999; }
 .mesclasses-fiche { display: inline-block; margin-top: 4px; padding: 7px 14px; border-radius: 20px; background: #f55700; color: #fff; font-family: 'League Spartan', sans-serif; font-size: 12px; font-weight: 700; text-decoration: none; text-align: center; }
 .mesclasses-fiche:hover { background: #d94a00; }
+.mesclasses-accordion { margin-top: 1.5rem; background: #FFF9F2; border: 0.5px solid rgba(2,93,184,0.15); border-radius: 12px; overflow: hidden; }
+.mesclasses-accordion-header { display: flex; align-items: center; justify-content: space-between; padding: 0.9rem 1.25rem; cursor: pointer; user-select: none; font-family: 'League Spartan', sans-serif; font-weight: 700; color: #2e2e2e; font-size: 14px; transition: background .15s; }
+.mesclasses-accordion-header:hover { background: rgba(2,93,184,0.05); }
+.mesclasses-accordion-header .chevron { color: #888; font-size: 18px; transition: transform .25s; }
+.mesclasses-accordion-body { padding: 0 1.25rem 1.25rem; }
 .points-card { direction: ltr; margin-bottom: 1.5rem; }
 .points-title { font-family: 'League Spartan', sans-serif; font-size: 18px; font-weight: 700; color: #025db8; margin-bottom: 12px; }
 .points-list { list-style: none; display: flex; flex-direction: column; gap: 10px; margin-bottom: 1.5rem; }
@@ -305,8 +317,12 @@ const FLD_RH_BOOKING      = 'fldXWjD6TAHKVWeP4';
 // ── GOOGLE AUTH ──
 const GOOGLE_CLIENT_ID  = '208792012375-tah7nn3utsgsnbgs9fv2ah5mr17qcr6n.apps.googleusercontent.com';
 const ALLOWED_DOMAIN    = 'oulpanlavi.com';
+const ADMIN_EMAILS      = ['yossi@oulpanlavi.com'];
 
 let sentClasses = {};
+let adminSessionActive = false;
+let adminSessionEmail = null;
+let adminTeachersList = null;
 let annuaireLoaded = false;
 let annuaireLoading = false;
 let mesclassesLoaded = false;
@@ -391,8 +407,12 @@ function loading(msg) { setRoot(`<div class="loading"><div class="spinner"></div
 
 // ── HEADER ──
 function renderHeaderUser(teacher) {
+  const adminControls = adminSessionActive ? `
+      <span class="admin-badge">🛠 מנהל</span>
+      <button class="btn-logout" onclick="switchAdminTeacher()">🔄 החלפת מורה</button>` : '';
   document.getElementById('header-right').innerHTML = `
     <div style="display:flex;align-items:center;gap:10px;direction:ltr;">
+      ${adminControls}
       <span style="color:rgba(255,255,255,0.9);font-size:13px;font-weight:500;">${teacher.name}</span>
       <button class="btn-logout" onclick="logout()">התנתקות</button>
     </div>`;
@@ -405,7 +425,7 @@ function renderHeaderDefault() {
 }
 
 // ── INIT ──
-function init() {
+function resetTeacherState() {
   sessionId++;          // invalide tout chargement encore en cours
   classesLoading = false;
   classesLoaded = false;
@@ -419,9 +439,22 @@ function init() {
   allClassesLight = null;
   remplacementSelected = null;
   state = { teacher: null, classes: [], students: {}, presences: {}, rapportRecords: {}, presenceRecordsToday: {}, presenceCache: {}, presenceMeta: {}, annuaire: [], mesclasses: [], absenceClasses: [] };
+}
+
+function init() {
+  adminSessionActive = false;
+  adminSessionEmail = null;
+  resetTeacherState();
   renderHeaderDefault();
   hideTabs();
   renderLogin();
+}
+
+function switchAdminTeacher() {
+  resetTeacherState();
+  renderHeaderDefault();
+  hideTabs();
+  showAdminPicker();
 }
 
 // ── LOGIN GOOGLE ──
@@ -484,7 +517,13 @@ async function handleGoogleCredential(response) {
       return;
     }
 
-    await loginByEmail(email);
+    if (ADMIN_EMAILS.includes(email)) {
+      adminSessionActive = true;
+      adminSessionEmail = email;
+      await showAdminPicker();
+    } else {
+      await loginByEmail(email);
+    }
   } catch (e) {
     renderLogin('שגיאה בהתחברות: ' + e.message);
   }
@@ -602,6 +641,48 @@ async function openTab(tabName) {
     showTabs();
     switchTab(tabName);
   }
+}
+
+// ── MODE ADMIN ──
+async function showAdminPicker(filterText) {
+  hideTabs();
+  if (!adminTeachersList) {
+    loading('טוען רשימת מורים...');
+    try {
+      const recs = await getAll(BASE_COURS, TABLE_TEACHERS, '');
+      adminTeachersList = recs
+        .map(r => ({ id: r.id, name: (r.fields['Name'] || '').trim(), email: (r.fields['Email'] || '').trim() }))
+        .filter(t => t.email)
+        .sort((a, b) => a.name.localeCompare(b.name, 'he'));
+    } catch (e) {
+      setRoot(`<div class="error-msg">Erreur : ${e.message}</div>`);
+      return;
+    }
+  }
+  renderAdminPickerList(filterText);
+}
+
+function renderAdminPickerList(filterText) {
+  const q = (filterText || '').trim().toLowerCase();
+  const list = q
+    ? adminTeachersList.filter(t => t.name.toLowerCase().includes(q) || t.email.toLowerCase().includes(q))
+    : adminTeachersList;
+  const items = list.map(t => `
+    <div class="admin-teacher-row" onclick="selectAdminTeacher('${t.email.replace(/'/g, "\\'")}')">
+      <span class="admin-teacher-name">${t.name}</span>
+      <span class="admin-teacher-email">${t.email}</span>
+    </div>`).join('');
+  setRoot(`
+    <div class="card login-card" style="max-width:520px;">
+      <div class="login-title">🛠 מצב מנהל</div>
+      <div class="login-sub">בחר/י מורה כדי להתחבר בשמו/ה</div>
+      <input type="text" class="email-input" style="width:100%;margin-bottom:1rem;direction:rtl;" placeholder="חיפוש לפי שם או אימייל..." value="${filterText || ''}" oninput="renderAdminPickerList(this.value)" />
+      <div class="admin-teacher-list">${items || '<div class="submit-class-note" style="text-align:center;padding:1rem;">לא נמצאו מורים</div>'}</div>
+    </div>`);
+}
+
+async function selectAdminTeacher(email) {
+  await loginByEmail(email);
 }
 
 async function loginByEmail(emailArg) {
@@ -1348,7 +1429,7 @@ async function loadAnnuaire() {
         city: (f[FLD_RH_CITY] || '').trim(),
         phone: (f[FLD_RH_PHONE] || '').trim(),
         email: (f[FLD_RH_EMAIL_PRO] || f[FLD_RH_EMAIL_PERSO] || '').trim(),
-        status: (f[FLD_RH_STATUS] && f[FLD_RH_STATUS].name) || '',
+        status: f[FLD_RH_STATUS] || '',
         photoUrl: photo ? (photo.thumbnails?.large?.url || photo.url) : null,
         bookingUrl: (booking && booking.url) ? booking.url.trim() : ''
       };
@@ -1457,16 +1538,16 @@ async function loadMesClasses() {
         num: f[FLD_CL_NUM] || '',
         autoId: f[FLD_CL_AUTOID] || '',
         ancienne: f[FLD_CL_ANCIENNE] || '',
-        type: (f[FLD_CL_TYPE] && f[FLD_CL_TYPE].name) || '',
+        type: f[FLD_CL_TYPE] || '',
         endroit: endroitNames.join(', '),
         hours: f[FLD_CL_HOURS] != null ? f[FLD_CL_HOURS] : '',
-        niveau: (f[FLD_CL_NIVEAU] && f[FLD_CL_NIVEAU].name) || '',
+        niveau: f[FLD_CL_NIVEAU] || '',
         chapitre: f[FLD_CL_CHAPITRE] || '',
         jour: f[FLD_CL_JOUR_TEXT] || '',
         horaires: f[FLD_CL_HORAIRES] || '',
         debute: formatFrDate(debute),
         termine: formatFrDate(termine),
-        status: (f[FLD_CL_STATUS] && f[FLD_CL_STATUS].name) || '',
+        status: f[FLD_CL_STATUS] || '',
         studentsCount: (f[FLD_CL_STUDENTS] || []).length,
         fiche: f[FLD_CL_FICHE] || ''
       };
@@ -1487,22 +1568,8 @@ function statusCssClass(status) {
   return 'creation';
 }
 
-function renderMesClassesTab() {
-  const list = state.mesclasses || [];
-  let html = `
-    <div class="prof-header">
-      <div>
-        <div class="prof-name">${state.teacher.name}</div>
-        <div class="prof-meta">הכיתות שלי • ${list.length} ${list.length !== 1 ? 'כיתות' : 'כיתה'}</div>
-      </div>
-    </div>`;
-
-  if (!list.length) {
-    html += `<div class="annuaire-empty">לא נמצאו כיתות</div>`;
-  } else {
-    html += `<div class="mesclasses-grid">`;
-    for (const c of list) {
-      html += `
+function renderMesClassCard(c) {
+  return `
         <div class="mesclasses-card">
           <div class="mesclasses-head">
             <div class="mesclasses-title">כיתה ${c.num}</div>
@@ -1524,8 +1591,51 @@ function renderMesClassesTab() {
             ${c.fiche ? `<a class="mesclasses-fiche" href="${c.fiche}" target="_blank" rel="noopener">📄 Fiche d'informations</a>` : ''}
           </div>
         </div>`;
+}
+
+function toggleCompleteAccordion() {
+  const body = document.getElementById('mesclasses-complete-body');
+  const chevron = document.getElementById('mesclasses-complete-chevron');
+  if (!body) return;
+  const isOpen = body.style.display !== 'none';
+  body.style.display = isOpen ? 'none' : 'block';
+  if (chevron) chevron.style.transform = isOpen ? 'rotate(0deg)' : 'rotate(180deg)';
+}
+
+function renderMesClassesTab() {
+  const list = state.mesclasses || [];
+  const activeList = list.filter(c => c.status !== 'Complete');
+  const completeList = list.filter(c => c.status === 'Complete');
+  let html = `
+    <div class="prof-header">
+      <div>
+        <div class="prof-name">${state.teacher.name}</div>
+        <div class="prof-meta">הכיתות שלי • ${list.length} ${list.length !== 1 ? 'כיתות' : 'כיתה'}</div>
+      </div>
+    </div>`;
+
+  if (!activeList.length && !completeList.length) {
+    html += `<div class="annuaire-empty">לא נמצאו כיתות</div>`;
+  } else {
+    if (activeList.length) {
+      html += `<div class="mesclasses-grid">`;
+      for (const c of activeList) html += renderMesClassCard(c);
+      html += `</div>`;
     }
-    html += `</div>`;
+    if (completeList.length) {
+      html += `
+        <div class="mesclasses-accordion">
+          <div class="mesclasses-accordion-header" onclick="toggleCompleteAccordion()">
+            <span>📁 כיתות שהסתיימו (${completeList.length})</span>
+            <span class="chevron" id="mesclasses-complete-chevron">▾</span>
+          </div>
+          <div class="mesclasses-accordion-body" id="mesclasses-complete-body" style="display:none;">
+            <div class="mesclasses-grid">
+              ${completeList.map(renderMesClassCard).join('')}
+            </div>
+          </div>
+        </div>`;
+    }
   }
   setTab('mesclasses', html);
 }
