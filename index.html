@@ -179,6 +179,11 @@ textarea.bakasha-input { min-height: 80px; resize: vertical; }
 .mesclasses-status.creation { background: #eee; color: #999; }
 .mesclasses-fiche { display: inline-block; margin-top: 4px; padding: 7px 14px; border-radius: 20px; background: #f55700; color: #fff; font-family: 'League Spartan', sans-serif; font-size: 12px; font-weight: 700; text-decoration: none; text-align: center; }
 .mesclasses-fiche:hover { background: #d94a00; }
+.mesclasses-accordion { margin-top: 1.5rem; background: #FFF9F2; border: 0.5px solid rgba(2,93,184,0.15); border-radius: 12px; overflow: hidden; }
+.mesclasses-accordion-header { display: flex; align-items: center; justify-content: space-between; padding: 0.9rem 1.25rem; cursor: pointer; user-select: none; font-family: 'League Spartan', sans-serif; font-weight: 700; color: #2e2e2e; font-size: 14px; transition: background .15s; }
+.mesclasses-accordion-header:hover { background: rgba(2,93,184,0.05); }
+.mesclasses-accordion-header .chevron { color: #888; font-size: 18px; transition: transform .25s; }
+.mesclasses-accordion-body { padding: 0 1.25rem 1.25rem; }
 .points-card { direction: ltr; margin-bottom: 1.5rem; }
 .points-title { font-family: 'League Spartan', sans-serif; font-size: 18px; font-weight: 700; color: #025db8; margin-bottom: 12px; }
 .points-list { list-style: none; display: flex; flex-direction: column; gap: 10px; margin-bottom: 1.5rem; }
@@ -1563,22 +1568,8 @@ function statusCssClass(status) {
   return 'creation';
 }
 
-function renderMesClassesTab() {
-  const list = state.mesclasses || [];
-  let html = `
-    <div class="prof-header">
-      <div>
-        <div class="prof-name">${state.teacher.name}</div>
-        <div class="prof-meta">הכיתות שלי • ${list.length} ${list.length !== 1 ? 'כיתות' : 'כיתה'}</div>
-      </div>
-    </div>`;
-
-  if (!list.length) {
-    html += `<div class="annuaire-empty">לא נמצאו כיתות</div>`;
-  } else {
-    html += `<div class="mesclasses-grid">`;
-    for (const c of list) {
-      html += `
+function renderMesClassCard(c) {
+  return `
         <div class="mesclasses-card">
           <div class="mesclasses-head">
             <div class="mesclasses-title">כיתה ${c.num}</div>
@@ -1600,8 +1591,51 @@ function renderMesClassesTab() {
             ${c.fiche ? `<a class="mesclasses-fiche" href="${c.fiche}" target="_blank" rel="noopener">📄 Fiche d'informations</a>` : ''}
           </div>
         </div>`;
+}
+
+function toggleCompleteAccordion() {
+  const body = document.getElementById('mesclasses-complete-body');
+  const chevron = document.getElementById('mesclasses-complete-chevron');
+  if (!body) return;
+  const isOpen = body.style.display !== 'none';
+  body.style.display = isOpen ? 'none' : 'block';
+  if (chevron) chevron.style.transform = isOpen ? 'rotate(0deg)' : 'rotate(180deg)';
+}
+
+function renderMesClassesTab() {
+  const list = state.mesclasses || [];
+  const activeList = list.filter(c => c.status !== 'Complete');
+  const completeList = list.filter(c => c.status === 'Complete');
+  let html = `
+    <div class="prof-header">
+      <div>
+        <div class="prof-name">${state.teacher.name}</div>
+        <div class="prof-meta">הכיתות שלי • ${list.length} ${list.length !== 1 ? 'כיתות' : 'כיתה'}</div>
+      </div>
+    </div>`;
+
+  if (!activeList.length && !completeList.length) {
+    html += `<div class="annuaire-empty">לא נמצאו כיתות</div>`;
+  } else {
+    if (activeList.length) {
+      html += `<div class="mesclasses-grid">`;
+      for (const c of activeList) html += renderMesClassCard(c);
+      html += `</div>`;
     }
-    html += `</div>`;
+    if (completeList.length) {
+      html += `
+        <div class="mesclasses-accordion">
+          <div class="mesclasses-accordion-header" onclick="toggleCompleteAccordion()">
+            <span>📁 כיתות שהסתיימו (${completeList.length})</span>
+            <span class="chevron" id="mesclasses-complete-chevron">▾</span>
+          </div>
+          <div class="mesclasses-accordion-body" id="mesclasses-complete-body" style="display:none;">
+            <div class="mesclasses-grid">
+              ${completeList.map(renderMesClassCard).join('')}
+            </div>
+          </div>
+        </div>`;
+    }
   }
   setTab('mesclasses', html);
 }
