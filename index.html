@@ -1429,7 +1429,7 @@ async function loadAnnuaire() {
         city: (f[FLD_RH_CITY] || '').trim(),
         phone: (f[FLD_RH_PHONE] || '').trim(),
         email: (f[FLD_RH_EMAIL_PRO] || f[FLD_RH_EMAIL_PERSO] || '').trim(),
-        status: (f[FLD_RH_STATUS] && f[FLD_RH_STATUS].name) || '',
+        status: f[FLD_RH_STATUS] || '',
         photoUrl: photo ? (photo.thumbnails?.large?.url || photo.url) : null,
         bookingUrl: (booking && booking.url) ? booking.url.trim() : ''
       };
@@ -1538,16 +1538,16 @@ async function loadMesClasses() {
         num: f[FLD_CL_NUM] || '',
         autoId: f[FLD_CL_AUTOID] || '',
         ancienne: f[FLD_CL_ANCIENNE] || '',
-        type: (f[FLD_CL_TYPE] && f[FLD_CL_TYPE].name) || '',
+        type: f[FLD_CL_TYPE] || '',
         endroit: endroitNames.join(', '),
         hours: f[FLD_CL_HOURS] != null ? f[FLD_CL_HOURS] : '',
-        niveau: (f[FLD_CL_NIVEAU] && f[FLD_CL_NIVEAU].name) || '',
+        niveau: f[FLD_CL_NIVEAU] || '',
         chapitre: f[FLD_CL_CHAPITRE] || '',
         jour: f[FLD_CL_JOUR_TEXT] || '',
         horaires: f[FLD_CL_HORAIRES] || '',
         debute: formatFrDate(debute),
         termine: formatFrDate(termine),
-        status: (f[FLD_CL_STATUS] && f[FLD_CL_STATUS].name) || '',
+        status: f[FLD_CL_STATUS] || '',
         studentsCount: (f[FLD_CL_STUDENTS] || []).length,
         fiche: f[FLD_CL_FICHE] || ''
       };
