@@ -43,6 +43,13 @@ body { font-family: 'Poppins', -apple-system, sans-serif; background: #f0ede8; c
 .dev-banner { background: #f8cf3e; color: #2e2e2e; border-radius: 8px; padding: 8px 12px; font-size: 12px; font-weight: 500; margin-bottom: 1rem; direction: ltr; }
 .btn-logout { padding: 5px 12px; border-radius: 6px; border: 1px solid rgba(255,255,255,0.3); background: transparent; color: rgba(255,255,255,0.85); font-family: 'Poppins', sans-serif; font-size: 12px; cursor: pointer; transition: background .15s; white-space: nowrap; }
 .btn-logout:hover { background: rgba(255,255,255,0.12); }
+.admin-badge { background: #f8cf3e; color: #2e2e2e; border-radius: 20px; font-size: 11px; font-weight: 700; padding: 3px 10px; white-space: nowrap; }
+.admin-teacher-list { max-height: 380px; overflow-y: auto; border-radius: 8px; border: 0.5px solid rgba(2,93,184,0.15); direction: rtl; }
+.admin-teacher-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 10px 14px; border-bottom: 0.5px solid rgba(2,93,184,0.08); cursor: pointer; transition: background .15s; }
+.admin-teacher-row:last-child { border-bottom: none; }
+.admin-teacher-row:hover { background: rgba(2,93,184,0.06); }
+.admin-teacher-name { font-size: 14px; font-weight: 600; color: #2e2e2e; }
+.admin-teacher-email { font-size: 12px; color: #888; direction: ltr; }
 .btn-ghost { padding: 8px 16px; border-radius: 8px; border: 0.5px solid rgba(2,93,184,0.3); background: transparent; color: #025db8; font-family: 'Poppins', sans-serif; font-size: 13px; cursor: pointer; }
 .btn-ghost:hover { background: rgba(2,93,184,0.05); }
 
@@ -305,8 +312,12 @@ const FLD_RH_BOOKING      = 'fldXWjD6TAHKVWeP4';
 // ── GOOGLE AUTH ──
 const GOOGLE_CLIENT_ID  = '208792012375-tah7nn3utsgsnbgs9fv2ah5mr17qcr6n.apps.googleusercontent.com';
 const ALLOWED_DOMAIN    = 'oulpanlavi.com';
+const ADMIN_EMAILS      = ['yossi@oulpanlavi.com'];
 
 let sentClasses = {};
+let adminSessionActive = false;
+let adminSessionEmail = null;
+let adminTeachersList = null;
 let annuaireLoaded = false;
 let annuaireLoading = false;
 let mesclassesLoaded = false;
@@ -391,8 +402,12 @@ function loading(msg) { setRoot(`<div class="loading"><div class="spinner"></div
 
 // ── HEADER ──
 function renderHeaderUser(teacher) {
+  const adminControls = adminSessionActive ? `
+      <span class="admin-badge">🛠 מנהל</span>
+      <button class="btn-logout" onclick="switchAdminTeacher()">🔄 החלפת מורה</button>` : '';
   document.getElementById('header-right').innerHTML = `
     <div style="display:flex;align-items:center;gap:10px;direction:ltr;">
+      ${adminControls}
       <span style="color:rgba(255,255,255,0.9);font-size:13px;font-weight:500;">${teacher.name}</span>
       <button class="btn-logout" onclick="logout()">התנתקות</button>
     </div>`;
@@ -405,7 +420,7 @@ function renderHeaderDefault() {
 }
 
 // ── INIT ──
-function init() {
+function resetTeacherState() {
   sessionId++;          // invalide tout chargement encore en cours
   classesLoading = false;
   classesLoaded = false;
@@ -419,9 +434,22 @@ function init() {
   allClassesLight = null;
   remplacementSelected = null;
   state = { teacher: null, classes: [], students: {}, presences: {}, rapportRecords: {}, presenceRecordsToday: {}, presenceCache: {}, presenceMeta: {}, annuaire: [], mesclasses: [], absenceClasses: [] };
+}
+
+function init() {
+  adminSessionActive = false;
+  adminSessionEmail = null;
+  resetTeacherState();
   renderHeaderDefault();
   hideTabs();
   renderLogin();
+}
+
+function switchAdminTeacher() {
+  resetTeacherState();
+  renderHeaderDefault();
+  hideTabs();
+  showAdminPicker();
 }
 
 // ── LOGIN GOOGLE ──
@@ -484,7 +512,13 @@ async function handleGoogleCredential(response) {
       return;
     }
 
-    await loginByEmail(email);
+    if (ADMIN_EMAILS.includes(email)) {
+      adminSessionActive = true;
+      adminSessionEmail = email;
+      await showAdminPicker();
+    } else {
+      await loginByEmail(email);
+    }
   } catch (e) {
     renderLogin('שגיאה בהתחברות: ' + e.message);
   }
@@ -602,6 +636,48 @@ async function openTab(tabName) {
     showTabs();
     switchTab(tabName);
   }
+}
+
+// ── MODE ADMIN ──
+async function showAdminPicker(filterText) {
+  hideTabs();
+  if (!adminTeachersList) {
+    loading('טוען רשימת מורים...');
+    try {
+      const recs = await getAll(BASE_COURS, TABLE_TEACHERS, '');
+      adminTeachersList = recs
+        .map(r => ({ id: r.id, name: (r.fields['Name'] || '').trim(), email: (r.fields['Email'] || '').trim() }))
+        .filter(t => t.email)
+        .sort((a, b) => a.name.localeCompare(b.name, 'he'));
+    } catch (e) {
+      setRoot(`<div class="error-msg">Erreur : ${e.message}</div>`);
+      return;
+    }
+  }
+  renderAdminPickerList(filterText);
+}
+
+function renderAdminPickerList(filterText) {
+  const q = (filterText || '').trim().toLowerCase();
+  const list = q
+    ? adminTeachersList.filter(t => t.name.toLowerCase().includes(q) || t.email.toLowerCase().includes(q))
+    : adminTeachersList;
+  const items = list.map(t => `
+    <div class="admin-teacher-row" onclick="selectAdminTeacher('${t.email.replace(/'/g, "\\'")}')">
+      <span class="admin-teacher-name">${t.name}</span>
+      <span class="admin-teacher-email">${t.email}</span>
+    </div>`).join('');
+  setRoot(`
+    <div class="card login-card" style="max-width:520px;">
+      <div class="login-title">🛠 מצב מנהל</div>
+      <div class="login-sub">בחר/י מורה כדי להתחבר בשמו/ה</div>
+      <input type="text" class="email-input" style="width:100%;margin-bottom:1rem;direction:rtl;" placeholder="חיפוש לפי שם או אימייל..." value="${filterText || ''}" oninput="renderAdminPickerList(this.value)" />
+      <div class="admin-teacher-list">${items || '<div class="submit-class-note" style="text-align:center;padding:1rem;">לא נמצאו מורים</div>'}</div>
+    </div>`);
+}
+
+async function selectAdminTeacher(email) {
+  await loginByEmail(email);
 }
 
 async function loginByEmail(emailArg) {
