@@ -196,6 +196,15 @@ table.contact-table { width: 100%; border-collapse: collapse; font-size: 12.5px;
 .contact-table td { padding: 8px 12px; border-bottom: 0.5px solid rgba(2,93,184,0.07); color: #2e2e2e; }
 .contact-table tr:last-child td { border-bottom: none; }
 
+.remplacement-props { margin-top: 2.5rem; text-align: right; direction: rtl; }
+.remplacement-props-title { font-family: 'League Spartan', sans-serif; font-size: 17px; font-weight: 700; color: #f55700; margin-bottom: 12px; }
+.remplacement-props-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 12px; }
+.remplacement-prop-card { background: #FFF9F2; border: 0.5px solid rgba(245,87,0,0.25); border-radius: 12px; overflow: hidden; }
+.remplacement-prop-head { background: #f55700; color: #fff; font-family: 'League Spartan', sans-serif; font-weight: 700; font-size: 15px; padding: 8px 14px; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.remplacement-prop-date { font-size: 12px; font-weight: 500; color: rgba(255,255,255,0.85); }
+.remplacement-prop-body { padding: 10px 14px; display: flex; flex-direction: column; gap: 4px; font-size: 12.5px; color: #2e2e2e; }
+.remplacement-props-note { margin-top: 14px; font-size: 13px; color: #666; text-align: center; }
+
 @media (max-width: 680px) { .welcome-cards { grid-template-columns: 1fr; } }
 
 /* ── SHARED ── */
@@ -299,6 +308,7 @@ const FLD_ABS_TEACHER   = 'fldCVfLoV3TXvTycH'; // Enseignant(e)
 const FLD_ABS_DATE      = 'fld1RZ9dTN84WyRhT'; // Date de l'absence
 const FLD_ABS_CLASSE    = 'fld4ydS6ZndZyDcAk'; // Classe de l'absence
 const FLD_ABS_MOTIF     = 'fldLGLrkDLTLd1voZ'; // Motif
+const VIEW_REMPLACEMENT = 'viwKnttLCLPIQ2ien'; // vue "Propositions de remplacement"
 
 // Base RH — annuaire de l'équipe (vue "Photo Directory")
 const BASE_RH            = 'appDIFUhvkazrti2M';
@@ -615,8 +625,10 @@ function renderWelcome() {
           <div class="welcome-card-desc">Vos préférences et demandes pour l'année 5787</div>
         </div>
       </div>
+      <div id="remplacement-proposals"></div>
     </div>
   `);
+  loadRemplacementProposals();
 }
 
 async function openTab(tabName) {
@@ -1682,6 +1694,82 @@ function renderPointsTab() {
       </div>
     </div>`;
   setTab('points', html);
+}
+
+// ── PROPOSITIONS DE REMPLACEMENT (écran d'accueil) ──
+async function loadRemplacementProposals() {
+  const container = document.getElementById('remplacement-proposals');
+  if (!container) return;
+  try {
+    const recs = await getAll(BASE_COURS, TABLE_ABSENCES, `?view=${VIEW_REMPLACEMENT}&returnFieldsByFieldId=true`);
+    if (!recs.length) { container.innerHTML = ''; return; }
+
+    const classIds = [...new Set(recs.flatMap(r => r.fields[FLD_ABS_CLASSE] || []))];
+    if (!classIds.length) { container.innerHTML = ''; return; }
+    const lieux = await loadLieuxMap();
+    const classInfo = {};
+    for (let i = 0; i < classIds.length; i += 10) {
+      const batch = classIds.slice(i, i + 10);
+      const formula = encodeURIComponent(`OR(${batch.map(id => `RECORD_ID()="${id}"`).join(',')})`);
+      const res = await api(BASE_COURS, TABLE_CLASSES, `?filterByFormula=${formula}&returnFieldsByFieldId=true`);
+      for (const c of (res.records || [])) {
+        const f = c.fields;
+        const endroitIds = f[FLD_CL_ENDROIT] || [];
+        classInfo[c.id] = {
+          num: f[FLD_CL_NUM] || '',
+          niveau: f[FLD_CL_NIVEAU] || '',
+          jour: f[FLD_CL_JOUR_TEXT] || '',
+          horaires: f[FLD_CL_HORAIRES] || '',
+          endroit: endroitIds.map(id => lieux[id] || '').filter(Boolean).join(', ')
+        };
+      }
+    }
+
+    const todayStr = getTodayStr();
+    const props = recs
+      .map(r => {
+        const cid = (r.fields[FLD_ABS_CLASSE] || [])[0];
+        const info = classInfo[cid] || {};
+        return {
+          date: r.fields[FLD_ABS_DATE] || '',
+          num: info.num || '',
+          niveau: info.niveau || '',
+          jour: info.jour || '',
+          horaires: info.horaires || '',
+          endroit: info.endroit || ''
+        };
+      })
+      .filter(p => p.num && p.date >= todayStr)
+      .sort((a, b) => a.date.localeCompare(b.date));
+
+    if (!props.length) { container.innerHTML = ''; return; }
+
+    let html = `
+      <div class="remplacement-props">
+        <div class="remplacement-props-title">🔄 הצעות להחלפת שיעורים</div>
+        <div class="remplacement-props-list">`;
+    for (const p of props) {
+      html += `
+          <div class="remplacement-prop-card">
+            <div class="remplacement-prop-head">
+              <span>כיתה ${p.num}</span>
+              ${p.date ? `<span class="remplacement-prop-date">${formatFrDate(p.date)}</span>` : ''}
+            </div>
+            <div class="remplacement-prop-body">
+              ${p.niveau ? `<div>${p.niveau}</div>` : ''}
+              ${(p.jour || p.horaires) ? `<div>${[p.jour, p.horaires].filter(Boolean).join(' • ')}</div>` : ''}
+              ${p.endroit ? `<div>${p.endroit}</div>` : ''}
+            </div>
+          </div>`;
+    }
+    html += `
+        </div>
+        <div class="remplacement-props-note">צרו קשר עם מיכל אם תוכלו לקחת אחד מהשיעורים האלה 😊</div>
+      </div>`;
+    container.innerHTML = html;
+  } catch (e) {
+    container.innerHTML = '';
+  }
 }
 
 // ── ONGLET 7 : DÉCLARER UNE ABSENCE ──
