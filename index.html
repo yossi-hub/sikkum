@@ -1716,6 +1716,7 @@ async function loadRemplacementProposals() {
         const endroitIds = f[FLD_CL_ENDROIT] || [];
         classInfo[c.id] = {
           num: f[FLD_CL_NUM] || '',
+          niveau: f[FLD_CL_NIVEAU] || '',
           jour: f[FLD_CL_JOUR_TEXT] || '',
           horaires: f[FLD_CL_HORAIRES] || '',
           endroit: endroitIds.map(id => lieux[id] || '').filter(Boolean).join(', ')
@@ -1731,6 +1732,7 @@ async function loadRemplacementProposals() {
         return {
           date: r.fields[FLD_ABS_DATE] || '',
           num: info.num || '',
+          niveau: info.niveau || '',
           jour: info.jour || '',
           horaires: info.horaires || '',
           endroit: info.endroit || ''
@@ -1750,6 +1752,7 @@ async function loadRemplacementProposals() {
           <div class="remplacement-prop-card">
             <div class="remplacement-prop-head">כיתה ${p.num}</div>
             <div class="remplacement-prop-body">
+              ${p.niveau ? `<div>${p.niveau}</div>` : ''}
               ${(p.jour || p.horaires) ? `<div>${[p.jour, p.horaires].filter(Boolean).join(' • ')}</div>` : ''}
               ${p.date ? `<div>${formatFrDate(p.date)}</div>` : ''}
               ${p.endroit ? `<div>${p.endroit}</div>` : ''}
@@ -1758,7 +1761,7 @@ async function loadRemplacementProposals() {
     }
     html += `
         </div>
-        <div class="remplacement-props-note">צריכים החלפה? צרו קשר עם מיכל אם תוכלו לקחת אחד מהשיעורים האלה 😊</div>
+        <div class="remplacement-props-note">צרו קשר עם מיכל אם תוכלו לקחת אחד מהשיעורים האלה 😊</div>
       </div>`;
     container.innerHTML = html;
   } catch (e) {
