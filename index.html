@@ -200,7 +200,8 @@ table.contact-table { width: 100%; border-collapse: collapse; font-size: 12.5px;
 .remplacement-props-title { font-family: 'League Spartan', sans-serif; font-size: 17px; font-weight: 700; color: #f55700; margin-bottom: 12px; }
 .remplacement-props-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(210px, 1fr)); gap: 12px; }
 .remplacement-prop-card { background: #FFF9F2; border: 0.5px solid rgba(245,87,0,0.25); border-radius: 12px; overflow: hidden; }
-.remplacement-prop-head { background: #f55700; color: #fff; font-family: 'League Spartan', sans-serif; font-weight: 700; font-size: 15px; padding: 8px 14px; }
+.remplacement-prop-head { background: #f55700; color: #fff; font-family: 'League Spartan', sans-serif; font-weight: 700; font-size: 15px; padding: 8px 14px; display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.remplacement-prop-date { font-size: 12px; font-weight: 500; color: rgba(255,255,255,0.85); }
 .remplacement-prop-body { padding: 10px 14px; display: flex; flex-direction: column; gap: 4px; font-size: 12.5px; color: #2e2e2e; }
 .remplacement-props-note { margin-top: 14px; font-size: 13px; color: #666; text-align: center; }
 
@@ -1750,11 +1751,13 @@ async function loadRemplacementProposals() {
     for (const p of props) {
       html += `
           <div class="remplacement-prop-card">
-            <div class="remplacement-prop-head">כיתה ${p.num}</div>
+            <div class="remplacement-prop-head">
+              <span>כיתה ${p.num}</span>
+              ${p.date ? `<span class="remplacement-prop-date">${formatFrDate(p.date)}</span>` : ''}
+            </div>
             <div class="remplacement-prop-body">
               ${p.niveau ? `<div>${p.niveau}</div>` : ''}
               ${(p.jour || p.horaires) ? `<div>${[p.jour, p.horaires].filter(Boolean).join(' • ')}</div>` : ''}
-              ${p.date ? `<div>${formatFrDate(p.date)}</div>` : ''}
               ${p.endroit ? `<div>${p.endroit}</div>` : ''}
             </div>
           </div>`;
