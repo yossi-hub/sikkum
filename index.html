@@ -50,6 +50,10 @@ body { font-family: 'Poppins', -apple-system, sans-serif; background: #f0ede8; c
 .admin-teacher-row:hover { background: rgba(2,93,184,0.06); }
 .admin-teacher-name { font-size: 14px; font-weight: 600; color: #2e2e2e; }
 .admin-teacher-email { font-size: 12px; color: #888; direction: ltr; }
+.admin-tabs-list { display: flex; flex-direction: column; gap: 4px; direction: rtl; }
+.admin-tab-row { display: flex; align-items: center; gap: 10px; padding: 10px 12px; border-radius: 8px; cursor: pointer; transition: background .15s; font-size: 14px; color: #2e2e2e; }
+.admin-tab-row:hover { background: rgba(2,93,184,0.05); }
+.admin-tab-row input[type=checkbox] { width: 18px; height: 18px; accent-color: #025db8; cursor: pointer; flex-shrink: 0; }
 .btn-ghost { padding: 8px 16px; border-radius: 8px; border: 0.5px solid rgba(2,93,184,0.3); background: transparent; color: #025db8; font-family: 'Poppins', sans-serif; font-size: 13px; cursor: pointer; }
 .btn-ghost:hover { background: rgba(2,93,184,0.05); }
 
@@ -238,15 +242,7 @@ table.contact-table { width: 100%; border-collapse: collapse; font-size: 12.5px;
       <div class="header-sub">Présences, Bilans, etc.</div>
     </div>
   </div>
-  <div id="tabs-bar" class="tabs-bar" style="display:none;">
-    <button class="tab-btn active" onclick="switchTab('annuaire')">👥 אנשי צוות</button>
-    <button class="tab-btn" onclick="switchTab('mesclasses')">🏫 הכיתות שלי</button>
-    <button class="tab-btn" onclick="switchTab('presence')">✅ נוכחות</button>
-    <button class="tab-btn" onclick="switchTab('sikkum')">📋 דוח סיום שנה</button>
-    <button class="tab-btn" onclick="switchTab('points')">🔑 נקודות חשובות</button>
-    <button class="tab-btn" onclick="switchTab('absence')">🤒 דיווח היעדרות</button>
-    <button class="tab-btn" onclick="switchTab('bakasha')">📝 בקשות לשנה הבאה</button>
-  </div>
+  <div id="tabs-bar" class="tabs-bar" style="display:none;"></div>
   <div class="content">
     <div id="root"></div>
     <div id="tabs-content" class="tabs-content" style="display:none;">
@@ -310,6 +306,22 @@ const FLD_ABS_CLASSE    = 'fld4ydS6ZndZyDcAk'; // Classe de l'absence
 const FLD_ABS_MOTIF     = 'fldLGLrkDLTLd1voZ'; // Motif
 const VIEW_REMPLACEMENT = 'viwKnttLCLPIQ2ien'; // vue "Propositions de remplacement"
 
+// Table "Paramètres App" — gestion des onglets masqués (visible pour tous les profs)
+const TABLE_PARAMS      = 'tbl4cWV4PlQ8NGslX';
+const FLD_PARAMS_HIDDEN = 'fldfrqe9jhSeQ50vW';
+const PARAMS_RECORD_ID  = 'recRw31i389hBWXsX';
+
+const TAB_DEFS = {
+  annuaire:   { label: 'אנשי צוות',       icon: '👥', title: 'אנשי צוות',       desc: "Annuaire de l'équipe Oulpan Lavi" },
+  mesclasses: { label: 'הכיתות שלי',      icon: '🏫', title: 'הכיתות שלי',      desc: 'Détails complets de vos classes' },
+  presence:   { label: 'נוכחות',          icon: '✅', title: 'נוכחות',          desc: 'Registre de présence — cocher les élèves présents' },
+  sikkum:     { label: 'דוח סיום שנה',    icon: '📋', title: 'דוח סיום שנה',    desc: "Rapport de fin d'année — évaluations et bilan par classe" },
+  points:     { label: 'נקודות חשובות',   icon: '🔑', title: 'נקודות חשובות',   desc: 'Points importants et contacts utiles' },
+  absence:    { label: 'דיווח היעדרות',   icon: '🤒', title: 'דיווח היעדרות',   desc: 'Déclarer une absence' },
+  bakasha:    { label: 'בקשות לשנה הבאה', icon: '📝', title: 'בקשות לשנה הבאה', desc: "Vos préférences et demandes pour l'année 5787" }
+};
+const TAB_ORDER = ['annuaire', 'mesclasses', 'presence', 'sikkum', 'points', 'absence', 'bakasha'];
+
 // Base RH — annuaire de l'équipe (vue "Photo Directory")
 const BASE_RH            = 'appDIFUhvkazrti2M';
 const TABLE_RH            = 'tblnL1EXuEFAABbfY';
@@ -333,6 +345,7 @@ let sentClasses = {};
 let adminSessionActive = false;
 let adminSessionEmail = null;
 let adminTeachersList = null;
+let hiddenTabsSet = new Set();
 let annuaireLoaded = false;
 let annuaireLoading = false;
 let mesclassesLoaded = false;
@@ -372,17 +385,35 @@ async function getAll(base, table, params='') {
 // ── TABS ──
 // Active visuellement un onglet, sans déclencher de chargement
 function activateTabUI(name) {
-  document.querySelectorAll('.tab-btn').forEach((b, i) => {
-    const names = ['annuaire', 'mesclasses', 'presence', 'sikkum', 'points', 'absence', 'bakasha'];
-    b.classList.toggle('active', names[i] === name);
+  document.querySelectorAll('.tab-btn').forEach(b => {
+    b.classList.toggle('active', b.dataset.tab === name);
   });
   document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
   const panel = document.getElementById('tab-' + name);
   if (panel) panel.classList.add('active');
 }
 
+function renderTabsBar() {
+  const bar = document.getElementById('tabs-bar');
+  if (!bar) return;
+  bar.innerHTML = TAB_ORDER
+    .filter(key => !hiddenTabsSet.has(key))
+    .map(key => `<button class="tab-btn" data-tab="${key}" onclick="switchTab('${key}')">${TAB_DEFS[key].icon} ${TAB_DEFS[key].title}</button>`)
+    .join('');
+}
+
+async function loadHiddenTabs() {
+  try {
+    const rec = await api(BASE_COURS, TABLE_PARAMS, `/${PARAMS_RECORD_ID}?returnFieldsByFieldId=true`);
+    const labels = rec.fields[FLD_PARAMS_HIDDEN] || [];
+    hiddenTabsSet = new Set(TAB_ORDER.filter(key => labels.includes(TAB_DEFS[key].label)));
+  } catch (e) {
+    hiddenTabsSet = new Set();
+  }
+}
+
 function switchTab(name) {
-  if (!state.teacher) return;
+  if (!state.teacher || hiddenTabsSet.has(name)) return;
   activateTabUI(name);
   if (name === 'bakasha') {
     renderBakasha();
@@ -419,6 +450,7 @@ function loading(msg) { setRoot(`<div class="loading"><div class="spinner"></div
 function renderHeaderUser(teacher) {
   const adminControls = adminSessionActive ? `
       <span class="admin-badge">🛠 מנהל</span>
+      <button class="btn-logout" onclick="renderAdminTabsManager()">⚙️ ניהול תפריט</button>
       <button class="btn-logout" onclick="switchAdminTeacher()">🔄 החלפת מורה</button>` : '';
   document.getElementById('header-right').innerHTML = `
     <div style="display:flex;align-items:center;gap:10px;direction:ltr;">
@@ -584,47 +616,22 @@ function logout() {
 
 function renderWelcome() {
   hideTabs();
+  const cardsHtml = TAB_ORDER
+    .filter(key => !hiddenTabsSet.has(key))
+    .map(key => {
+      const t = TAB_DEFS[key];
+      return `
+        <div class="welcome-card" onclick="openTab('${key}')">
+          <div class="welcome-card-icon">${t.icon}</div>
+          <div class="welcome-card-title">${t.title}</div>
+          <div class="welcome-card-desc">${t.desc}</div>
+        </div>`;
+    }).join('');
   setRoot(`
     <div class="welcome-screen">
       <div class="welcome-name">שלום, ${state.teacher.name}! 👋</div>
       <div class="welcome-sub">Que souhaitez-vous faire aujourd'hui ?</div>
-      <div class="welcome-cards">
-        <div class="welcome-card" onclick="openTab('annuaire')">
-          <div class="welcome-card-icon">👥</div>
-          <div class="welcome-card-title">אנשי צוות</div>
-          <div class="welcome-card-desc">Annuaire de l'équipe Oulpan Lavi</div>
-        </div>
-        <div class="welcome-card" onclick="openTab('mesclasses')">
-          <div class="welcome-card-icon">🏫</div>
-          <div class="welcome-card-title">הכיתות שלי</div>
-          <div class="welcome-card-desc">Détails complets de vos classes</div>
-        </div>
-        <div class="welcome-card" onclick="openTab('presence')">
-          <div class="welcome-card-icon">✅</div>
-          <div class="welcome-card-title">נוכחות</div>
-          <div class="welcome-card-desc">Registre de présence — cocher les élèves présents</div>
-        </div>
-        <div class="welcome-card" onclick="openTab('sikkum')">
-          <div class="welcome-card-icon">📋</div>
-          <div class="welcome-card-title">דוח סיום שנה</div>
-          <div class="welcome-card-desc">Rapport de fin d'année — évaluations et bilan par classe</div>
-        </div>
-        <div class="welcome-card" onclick="openTab('points')">
-          <div class="welcome-card-icon">🔑</div>
-          <div class="welcome-card-title">נקודות חשובות</div>
-          <div class="welcome-card-desc">Points importants et contacts utiles</div>
-        </div>
-        <div class="welcome-card" onclick="openTab('absence')">
-          <div class="welcome-card-icon">🤒</div>
-          <div class="welcome-card-title">דיווח היעדרות</div>
-          <div class="welcome-card-desc">Déclarer une absence</div>
-        </div>
-        <div class="welcome-card" onclick="openTab('bakasha')">
-          <div class="welcome-card-icon">📝</div>
-          <div class="welcome-card-title">בקשות לשנה הבאה</div>
-          <div class="welcome-card-desc">Vos préférences et demandes pour l'année 5787</div>
-        </div>
-      </div>
+      <div class="welcome-cards">${cardsHtml}</div>
       <div id="remplacement-proposals"></div>
     </div>
   `);
@@ -632,6 +639,7 @@ function renderWelcome() {
 }
 
 async function openTab(tabName) {
+  if (hiddenTabsSet.has(tabName)) return;
   if (tabName === 'bakasha') {
     showTabs();
     switchTab('bakasha');
@@ -656,6 +664,57 @@ async function openTab(tabName) {
 }
 
 // ── MODE ADMIN ──
+function renderAdminTabsManager() {
+  hideTabs();
+  const rows = TAB_ORDER.map(key => {
+    const t = TAB_DEFS[key];
+    const checked = hiddenTabsSet.has(key) ? '' : 'checked';
+    return `
+      <label class="admin-tab-row">
+        <input type="checkbox" class="admin-tab-checkbox" data-tab="${key}" ${checked} />
+        <span>${t.icon} ${t.title}</span>
+      </label>`;
+  }).join('');
+  setRoot(`
+    <div class="card login-card" style="max-width:480px;">
+      <div class="login-title">⚙️ ניהול תפריט</div>
+      <div class="login-sub">סמן/י אילו אונגלטים יוצגו לכלל הצוות</div>
+      <div id="admin-tabs-error"></div>
+      <div class="admin-tabs-list">${rows}</div>
+      <div style="display:flex;gap:10px;margin-top:1.25rem;">
+        <button class="btn-blue" id="admin-tabs-save-btn" onclick="saveAdminTabsConfig()">💾 שמירה</button>
+        <button class="btn-ghost" onclick="cancelAdminTabsManager()">ביטול</button>
+      </div>
+    </div>
+  `);
+}
+
+function cancelAdminTabsManager() {
+  if (state.teacher) renderWelcome();
+  else showAdminPicker();
+}
+
+async function saveAdminTabsConfig() {
+  const btn = document.getElementById('admin-tabs-save-btn');
+  if (btn) { btn.disabled = true; btn.textContent = 'שומר...'; }
+  const hiddenLabels = [];
+  document.querySelectorAll('.admin-tab-checkbox').forEach(cb => {
+    if (!cb.checked) hiddenLabels.push(TAB_DEFS[cb.dataset.tab].label);
+  });
+  try {
+    await api(BASE_COURS, TABLE_PARAMS, `/${PARAMS_RECORD_ID}`, 'PATCH', { fields: { [FLD_PARAMS_HIDDEN]: hiddenLabels }, typecast: true });
+    hiddenTabsSet = new Set(TAB_ORDER.filter(key => hiddenLabels.includes(TAB_DEFS[key].label)));
+    renderTabsBar();
+    if (state.teacher) renderWelcome();
+    else showAdminPicker();
+  } catch (e) {
+    if (btn) { btn.disabled = false; btn.textContent = '💾 שמירה'; }
+    const errEl = document.getElementById('admin-tabs-error');
+    if (errEl) errEl.innerHTML = `<div class="error-msg">Erreur : ${e.message}</div>`;
+  }
+}
+
+
 async function showAdminPicker(filterText) {
   hideTabs();
   if (!adminTeachersList) {
@@ -671,6 +730,7 @@ async function showAdminPicker(filterText) {
       return;
     }
   }
+  await loadHiddenTabs();
   renderAdminPickerList(filterText);
 }
 
@@ -688,6 +748,7 @@ function renderAdminPickerList(filterText) {
     <div class="card login-card" style="max-width:520px;">
       <div class="login-title">🛠 מצב מנהל</div>
       <div class="login-sub">בחר/י מורה כדי להתחבר בשמו/ה</div>
+      <button class="btn-ghost" style="width:100%;margin-bottom:1rem;" onclick="renderAdminTabsManager()">⚙️ ניהול תפריט</button>
       <input type="text" class="email-input" style="width:100%;margin-bottom:1rem;direction:rtl;" placeholder="חיפוש לפי שם או אימייל..." value="${filterText || ''}" oninput="renderAdminPickerList(this.value)" />
       <div class="admin-teacher-list">${items || '<div class="submit-class-note" style="text-align:center;padding:1rem;">לא נמצאו מורים</div>'}</div>
     </div>`);
@@ -710,6 +771,8 @@ async function loginByEmail(emailArg) {
     }
     state.teacher = { id: found.id, name: (found.fields['Name'] || '').trim(), email: found.fields['Email'] || '', classIds: found.fields['Classes 5786'] || [] };
     if (!state.teacher.classIds.length) { renderLogin('לא נמצאו כיתות עבור משתמש זה.'); return; }
+    await loadHiddenTabs();
+    renderTabsBar();
     renderHeaderUser(state.teacher);
     renderWelcome();
   } catch(e) { setRoot(`<div class="error-msg">Erreur : ${e.message}</div>`); }
