@@ -404,7 +404,7 @@ function renderTabsBar() {
 
 async function loadHiddenTabs() {
   try {
-    const rec = await api(BASE_COURS, TABLE_PARAMS, `/${PARAMS_RECORD_ID}`);
+    const rec = await api(BASE_COURS, TABLE_PARAMS, `/${PARAMS_RECORD_ID}?returnFieldsByFieldId=true`);
     const labels = rec.fields[FLD_PARAMS_HIDDEN] || [];
     hiddenTabsSet = new Set(TAB_ORDER.filter(key => labels.includes(TAB_DEFS[key].label)));
   } catch (e) {
@@ -683,10 +683,15 @@ function renderAdminTabsManager() {
       <div class="admin-tabs-list">${rows}</div>
       <div style="display:flex;gap:10px;margin-top:1.25rem;">
         <button class="btn-blue" id="admin-tabs-save-btn" onclick="saveAdminTabsConfig()">💾 שמירה</button>
-        <button class="btn-ghost" onclick="renderWelcome()">ביטול</button>
+        <button class="btn-ghost" onclick="cancelAdminTabsManager()">ביטול</button>
       </div>
     </div>
   `);
+}
+
+function cancelAdminTabsManager() {
+  if (state.teacher) renderWelcome();
+  else showAdminPicker();
 }
 
 async function saveAdminTabsConfig() {
@@ -700,7 +705,8 @@ async function saveAdminTabsConfig() {
     await api(BASE_COURS, TABLE_PARAMS, `/${PARAMS_RECORD_ID}`, 'PATCH', { fields: { [FLD_PARAMS_HIDDEN]: hiddenLabels }, typecast: true });
     hiddenTabsSet = new Set(TAB_ORDER.filter(key => hiddenLabels.includes(TAB_DEFS[key].label)));
     renderTabsBar();
-    renderWelcome();
+    if (state.teacher) renderWelcome();
+    else showAdminPicker();
   } catch (e) {
     if (btn) { btn.disabled = false; btn.textContent = '💾 שמירה'; }
     const errEl = document.getElementById('admin-tabs-error');
@@ -724,6 +730,7 @@ async function showAdminPicker(filterText) {
       return;
     }
   }
+  await loadHiddenTabs();
   renderAdminPickerList(filterText);
 }
 
@@ -741,6 +748,7 @@ function renderAdminPickerList(filterText) {
     <div class="card login-card" style="max-width:520px;">
       <div class="login-title">🛠 מצב מנהל</div>
       <div class="login-sub">בחר/י מורה כדי להתחבר בשמו/ה</div>
+      <button class="btn-ghost" style="width:100%;margin-bottom:1rem;" onclick="renderAdminTabsManager()">⚙️ ניהול תפריט</button>
       <input type="text" class="email-input" style="width:100%;margin-bottom:1rem;direction:rtl;" placeholder="חיפוש לפי שם או אימייל..." value="${filterText || ''}" oninput="renderAdminPickerList(this.value)" />
       <div class="admin-teacher-list">${items || '<div class="submit-class-note" style="text-align:center;padding:1rem;">לא נמצאו מורים</div>'}</div>
     </div>`);
