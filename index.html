@@ -462,8 +462,7 @@ function renderHeaderUser(teacher) {
 
 function renderHeaderDefault() {
   document.getElementById('header-right').innerHTML = `
-    <div class="header-title">דוח סיום שנה</div>
-    <div class="header-sub">Rapport annuel fin d'année • 5786</div>`;
+    <div class="header-title">Team's App</div>`;
 }
 
 // ── INIT ──
@@ -770,7 +769,6 @@ async function loginByEmail(emailArg) {
       return;
     }
     state.teacher = { id: found.id, name: (found.fields['Name'] || '').trim(), email: found.fields['Email'] || '', classIds: found.fields['Classes 5786'] || [] };
-    if (!state.teacher.classIds.length) { renderLogin('לא נמצאו כיתות עבור משתמש זה.'); return; }
     await loadHiddenTabs();
     renderTabsBar();
     renderHeaderUser(state.teacher);
