@@ -769,7 +769,6 @@ async function loginByEmail(emailArg) {
       return;
     }
     state.teacher = { id: found.id, name: (found.fields['Name'] || '').trim(), email: found.fields['Email'] || '', classIds: found.fields['Classes 5786'] || [] };
-    if (!state.teacher.classIds.length) { renderLogin('לא נמצאו כיתות עבור משתמש זה.'); return; }
     await loadHiddenTabs();
     renderTabsBar();
     renderHeaderUser(state.teacher);
