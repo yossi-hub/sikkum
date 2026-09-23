@@ -1592,6 +1592,9 @@ async function submitPresence(classId) {
     for (let i = 0; i < toCreate.length; i += 10) {
       await api(BASE_COURS, TABLE_PRESENCES_JOUR, '', 'POST', { records: toCreate.slice(i, i + 10) });
     }
+    // Oublier la copie locale du jour pour relire les présences réelles depuis Airtable
+    // (sinon, après un 2e enregistrement, les cases réaffichaient l'ancien état)
+    delete state.presenceRecordsToday[classId];
     await loadAndRenderPresenceChecklist(classId, dateStr);
     loadPresenceHistory(classId, true); // rafraîchir l'historique avec la séance enregistrée
     if (dateStr === getTodayStr()) {
