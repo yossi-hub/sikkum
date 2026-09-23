@@ -1426,9 +1426,7 @@ function toggleMotifField(classId, sid) {
 
 function renderPresenceTab() {
   setTab('presence', buildPresenceHtml());
-  // Charger l'historique de la classe ouverte par défaut (les autres : à l'ouverture)
-  const firstOpen = document.querySelector('#tab-presence .classe-block.open');
-  if (firstOpen) loadPresenceHistory(firstOpen.id.replace('presblock-', ''));
+  // L'historique d'une classe se charge quand on l'ouvre (togglePresenceClass)
 }
 
 function buildPresenceHtml() {
@@ -1448,7 +1446,7 @@ function buildPresenceHtml() {
     const meta = state.presenceMeta[cls.id] || { chapitre: '', lecon: '' };
     state.presenceCache[cls.id] = { dateStr: todayStr, existingMap };
     const doneToday = Object.keys(existingMap).length > 0;
-    const isOpen = idx === 0;
+    const isOpen = false; // toutes les classes fermées à l'ouverture de l'onglet
     html += `
     <div class="classe-block${doneToday ? ' sent' : ''}${isOpen ? ' open' : ''}" id="presblock-${cls.id}">
       <div class="classe-header" onclick="togglePresenceClass('${cls.id}')">
