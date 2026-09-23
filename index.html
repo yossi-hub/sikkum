@@ -341,6 +341,7 @@ const VIEW_REMPLACEMENT = 'viwKnttLCLPIQ2ien'; // vue "Propositions de remplacem
 const TABLE_PARAMS      = 'tbl4cWV4PlQ8NGslX';
 const FLD_PARAMS_HIDDEN = 'fldfrqe9jhSeQ50vW';
 const PARAMS_RECORD_ID  = 'recRw31i389hBWXsX';
+const FLD_PARAMS_ADMINS = 'fldPl4DXdbAKlf47Y'; // Admins (texte long, un email par ligne)
 
 const TAB_DEFS = {
   annuaire:   { label: 'אנשי צוות',       icon: '👥', title: 'אנשי צוות',       desc: "Annuaire de l'équipe Oulpan Lavi" },
@@ -370,12 +371,33 @@ const FLD_RH_BOOKING      = 'fldXWjD6TAHKVWeP4';
 // ── GOOGLE AUTH ──
 const GOOGLE_CLIENT_ID  = '208792012375-tah7nn3utsgsnbgs9fv2ah5mr17qcr6n.apps.googleusercontent.com';
 const ALLOWED_DOMAIN    = 'oulpanlavi.com';
-const ADMIN_EMAILS      = ['yossi@oulpanlavi.com'];
+// Super-admin : toujours admin, ne peut pas être retiré depuis l'app (évite de se bloquer dehors)
+const SUPER_ADMIN_EMAILS = ['yossi@oulpanlavi.com'];
+// Autres admins : gérés depuis l'app, stockés dans le champ "Admins" de la table Paramètres App
+let extraAdminEmails = [];
 
 let sentClasses = {};
 let adminSessionActive = false;
 let adminSessionEmail = null;
 let adminTeachersList = null;
+
+function parseAdminEmails(txt) {
+  return [...new Set(String(txt || '').split(/[\s,;]+/).map(s => s.trim().toLowerCase()).filter(s => s.includes('@')))];
+}
+
+async function loadAdminEmails() {
+  try {
+    const rec = await api(BASE_COURS, TABLE_PARAMS, `/${PARAMS_RECORD_ID}?returnFieldsByFieldId=true`);
+    extraAdminEmails = parseAdminEmails(rec.fields[FLD_PARAMS_ADMINS]).filter(e => !SUPER_ADMIN_EMAILS.includes(e));
+  } catch (e) {
+    extraAdminEmails = []; // en cas d'erreur, seul le super-admin garde l'accès
+  }
+}
+
+function isAdminEmail(email) {
+  const e = (email || '').trim().toLowerCase();
+  return SUPER_ADMIN_EMAILS.includes(e) || extraAdminEmails.includes(e);
+}
 let hiddenTabsSet = new Set();
 let annuaireLoaded = false;
 let annuaireLoading = false;
@@ -482,6 +504,7 @@ function renderHeaderUser(teacher) {
   const adminControls = adminSessionActive ? `
       <span class="admin-badge">🛠 מנהל</span>
       <button class="btn-logout" onclick="renderAdminTabsManager()">⚙️ ניהול תפריט</button>
+      <button class="btn-logout" onclick="renderAdminUsersManager()">👥 ניהול מנהלים</button>
       <button class="btn-logout" onclick="switchAdminTeacher()">🔄 החלפת מורה</button>` : '';
   document.getElementById('header-right').innerHTML = `
     <div style="display:flex;align-items:center;gap:10px;direction:ltr;">
@@ -589,7 +612,8 @@ async function handleGoogleCredential(response) {
       return;
     }
 
-    if (ADMIN_EMAILS.includes(email)) {
+    await loadAdminEmails();
+    if (isAdminEmail(email)) {
       adminSessionActive = true;
       adminSessionEmail = email;
       await showAdminPicker();
@@ -744,6 +768,103 @@ async function saveAdminTabsConfig() {
   }
 }
 
+// ── GESTION DES ADMINS ──
+let adminUsersDraft = null; // liste en cours d'édition (avant sauvegarde)
+
+async function renderAdminUsersManager() {
+  if (!adminSessionActive) return;
+  hideTabs();
+  loading('טוען רשימת מנהלים...');
+  await loadAdminEmails();
+  if (!adminTeachersList) {
+    try {
+      const recs = await getAll(BASE_COURS, TABLE_TEACHERS, '');
+      adminTeachersList = recs
+        .map(r => ({ id: r.id, name: (r.fields['Name'] || '').trim(), email: (r.fields['Email'] || '').trim() }))
+        .filter(t => t.email)
+        .sort((a, b) => a.name.localeCompare(b.name, 'he'));
+    } catch (e) { adminTeachersList = []; }
+  }
+  adminUsersDraft = [...extraAdminEmails];
+  drawAdminUsersManager();
+}
+
+function adminNameForEmail(email) {
+  const t = (adminTeachersList || []).find(x => x.email.toLowerCase() === email);
+  return t ? t.name : '';
+}
+
+function drawAdminUsersManager(errMsg) {
+  const row = (email, locked) => {
+    const name = adminNameForEmail(email);
+    return `
+      <div class="admin-teacher-row" style="cursor:default;">
+        <span>
+          <span class="admin-teacher-name">${escHtml(name || email)}</span>
+          ${name ? `<span class="admin-teacher-email" style="display:block;">${escHtml(email)}</span>` : ''}
+        </span>
+        ${locked
+          ? `<span class="admin-teacher-email" title="Super-admin">🔒</span>`
+          : `<button class="btn-ghost" style="padding:4px 12px;" onclick="removeAdminDraft('${email.replace(/'/g, "\\'")}')">✕ הסרה</button>`}
+      </div>`;
+  };
+  const rows = SUPER_ADMIN_EMAILS.map(e => row(e, true)).join('') + adminUsersDraft.map(e => row(e, false)).join('');
+  const options = (adminTeachersList || [])
+    .filter(t => !isInAdminDraft(t.email.toLowerCase()))
+    .map(t => `<option value="${escHtml(t.email)}">${escHtml(t.name)}</option>`).join('');
+  setRoot(`
+    <div class="card login-card" style="max-width:520px;">
+      <div class="login-title">👥 ניהול מנהלים</div>
+      <div class="login-sub">Les admins voient le mode מנהל : se connecter à la place d'un prof, gérer le menu et les admins.</div>
+      ${errMsg ? `<div class="error-msg">${errMsg}</div>` : ''}
+      <div class="admin-teacher-list" style="margin-bottom:1rem;">${rows}</div>
+      <div style="display:flex;gap:8px;margin-bottom:1.25rem;">
+        <input type="text" list="admin-add-options" id="admin-add-input" class="email-input" style="flex:1;direction:ltr;" placeholder="prenom@oulpanlavi.com" onkeydown="if(event.key==='Enter') addAdminDraft()" autocomplete="off" />
+        <datalist id="admin-add-options">${options}</datalist>
+        <button class="btn-blue" onclick="addAdminDraft()">＋ הוספה</button>
+      </div>
+      <div style="display:flex;gap:10px;">
+        <button class="btn-blue" id="admin-users-save-btn" onclick="saveAdminUsers()">💾 שמירה</button>
+        <button class="btn-ghost" onclick="cancelAdminTabsManager()">ביטול</button>
+      </div>
+    </div>`);
+}
+
+function isInAdminDraft(email) {
+  return SUPER_ADMIN_EMAILS.includes(email) || (adminUsersDraft || []).includes(email);
+}
+
+function addAdminDraft() {
+  const input = document.getElementById('admin-add-input');
+  const email = (input?.value || '').trim().toLowerCase();
+  if (!email) return;
+  if (!/^[^\s@]+@[^\s@]+$/.test(email) || email.split('@')[1] !== ALLOWED_DOMAIN) {
+    drawAdminUsersManager(`כתובת לא תקינה — יש להזין כתובת @${ALLOWED_DOMAIN}`);
+    return;
+  }
+  if (!isInAdminDraft(email)) adminUsersDraft.push(email);
+  drawAdminUsersManager();
+}
+
+function removeAdminDraft(email) {
+  adminUsersDraft = adminUsersDraft.filter(e => e !== email);
+  drawAdminUsersManager();
+}
+
+async function saveAdminUsers() {
+  const btn = document.getElementById('admin-users-save-btn');
+  if (btn) { btn.disabled = true; btn.textContent = 'שומר...'; }
+  try {
+    await api(BASE_COURS, TABLE_PARAMS, `/${PARAMS_RECORD_ID}`, 'PATCH', { fields: { [FLD_PARAMS_ADMINS]: adminUsersDraft.join('\n') } });
+    extraAdminEmails = [...adminUsersDraft];
+    // Si l'admin connecté s'est retiré lui-même, il perd l'accès admin
+    if (!isAdminEmail(adminSessionEmail)) { logout(); return; }
+    cancelAdminTabsManager();
+  } catch (e) {
+    drawAdminUsersManager(`Erreur : ${escHtml(e.message)}`);
+  }
+}
+
 
 async function showAdminPicker(filterText) {
   hideTabs();
@@ -778,7 +899,10 @@ function renderAdminPickerList(filterText) {
     <div class="card login-card" style="max-width:520px;">
       <div class="login-title">🛠 מצב מנהל</div>
       <div class="login-sub">בחר/י מורה כדי להתחבר בשמו/ה</div>
-      <button class="btn-ghost" style="width:100%;margin-bottom:1rem;" onclick="renderAdminTabsManager()">⚙️ ניהול תפריט</button>
+      <div style="display:flex;gap:10px;margin-bottom:1rem;">
+        <button class="btn-ghost" style="flex:1;" onclick="renderAdminTabsManager()">⚙️ ניהול תפריט</button>
+        <button class="btn-ghost" style="flex:1;" onclick="renderAdminUsersManager()">👥 ניהול מנהלים</button>
+      </div>
       <input type="text" class="email-input" style="width:100%;margin-bottom:1rem;direction:rtl;" placeholder="חיפוש לפי שם או אימייל..." value="${filterText || ''}" oninput="renderAdminPickerList(this.value)" />
       <div class="admin-teacher-list">${items || '<div class="submit-class-note" style="text-align:center;padding:1rem;">לא נמצאו מורים</div>'}</div>
     </div>`);
