@@ -114,6 +114,37 @@ select.passage:focus { outline: none; border-color: #025db8; }
 .pres-row input[type=checkbox] { width: 18px; height: 18px; accent-color: #025db8; cursor: pointer; flex-shrink: 0; }
 .pres-motif { flex: 1; min-width: 140px; font-size: 12.5px; padding: 6px 8px; margin: 0; }
 
+/* Historique des séances précédentes */
+.pres-history { margin: 0.75rem 1.25rem 0; background: rgba(2,93,184,0.04); border: 0.5px solid rgba(2,93,184,0.15); border-radius: 10px; padding: 10px 12px; font-size: 13px; }
+.pres-hist-last { display: flex; align-items: flex-start; gap: 8px; color: #2e2e2e; line-height: 1.5; }
+.pres-hist-last-label { font-weight: 600; color: #025db8; white-space: nowrap; }
+.pres-hist-empty { color: #888; font-size: 12.5px; }
+.pres-hist-toggle { background: none; border: none; color: #f55700; font-family: 'Poppins', sans-serif; font-size: 12.5px; font-weight: 600; cursor: pointer; padding: 6px 0 0; }
+.pres-hist-list { display: none; margin-top: 8px; border-top: 0.5px solid rgba(2,93,184,0.12); padding-top: 6px; max-height: 380px; overflow-y: auto; }
+.pres-history.expanded .pres-hist-list { display: block; }
+.pres-hist-item { border-bottom: 0.5px solid rgba(2,93,184,0.07); }
+.pres-hist-item:last-child { border-bottom: none; }
+.pres-hist-row { display: grid; grid-template-columns: 78px 1fr auto; gap: 8px; align-items: baseline; padding: 7px 4px; cursor: pointer; border-radius: 6px; }
+.pres-hist-row:hover { background: rgba(2,93,184,0.06); }
+.pres-hist-chev { display: inline-block; color: #025db8; margin-right: 4px; transition: transform .15s; }
+.pres-hist-item.open .pres-hist-chev { transform: rotate(180deg); }
+.pres-hist-detail { display: none; margin: 0 4px 8px; padding: 8px 10px; background: #fff; border-radius: 8px; border: 0.5px solid rgba(2,93,184,0.12); font-size: 12.5px; line-height: 1.6; }
+.pres-hist-item.open .pres-hist-detail { display: block; }
+.pres-hist-detail-line { color: #2e2e2e; }
+.pres-hist-detail-title { font-weight: 600; margin-top: 6px; }
+.pres-hist-detail-title.ok { color: #1d8653; }
+.pres-hist-detail-title.ko { color: #f55700; }
+.pres-hist-names { color: #2e2e2e; }
+.pres-hist-detail .muted { color: #999; }
+.pres-hist-absents { margin: 2px 0 0; padding-right: 18px; }
+.pres-hist-edit { margin-top: 8px; background: none; border: 0.5px solid #025db8; color: #025db8; border-radius: 16px; padding: 4px 12px; font-family: 'Poppins', sans-serif; font-size: 12px; cursor: pointer; }
+.pres-hist-edit:hover { background: rgba(2,93,184,0.08); }
+.pres-hist-date { font-weight: 600; color: #2e2e2e; direction: ltr; text-align: right; }
+.pres-hist-content { color: #2e2e2e; }
+.pres-hist-content .muted { color: #aaa; }
+.pres-hist-prof { display: block; font-size: 11.5px; color: #888; }
+.pres-hist-count { font-size: 12px; color: #1d8653; font-weight: 600; white-space: nowrap; direction: ltr; }
+
 /* ── ONGLET 2 : BAKASHA ── */
 .bakasha-card { background: #FFF9F2; border: 0.5px solid rgba(2,93,184,0.15); border-radius: 12px; padding: 2rem 1.75rem; max-width: 680px; margin: 0 auto; }
 .bakasha-title { font-family: 'League Spartan', sans-serif; font-size: 20px; font-weight: 700; color: #025db8; margin-bottom: 4px; }
@@ -357,7 +388,7 @@ let remplacementSelected = null;
 let sessionId = 0;          // incrémenté à chaque init/déconnexion : invalide les chargements en cours
 let classesLoading = false; // évite de relancer un chargement déjà en cours
 let classesLoaded = false;  // vrai une fois les classes chargées avec succès
-let state = { teacher: null, classes: [], students: {}, presences: {}, rapportRecords: {}, presenceRecordsToday: {}, presenceCache: {}, presenceMeta: {}, annuaire: [], mesclasses: [], absenceClasses: [] };
+let state = { teacher: null, classes: [], students: {}, presences: {}, rapportRecords: {}, presenceRecordsToday: {}, presenceCache: {}, presenceMeta: {}, presenceHistory: {}, annuaire: [], mesclasses: [], absenceClasses: [] };
 
 // ── API ──
 async function api(base, table, params='', method='GET', body=null) {
@@ -479,7 +510,7 @@ function resetTeacherState() {
   sentClasses = {};
   allClassesLight = null;
   remplacementSelected = null;
-  state = { teacher: null, classes: [], students: {}, presences: {}, rapportRecords: {}, presenceRecordsToday: {}, presenceCache: {}, presenceMeta: {}, annuaire: [], mesclasses: [], absenceClasses: [] };
+  state = { teacher: null, classes: [], students: {}, presences: {}, rapportRecords: {}, presenceRecordsToday: {}, presenceCache: {}, presenceMeta: {}, presenceHistory: {}, annuaire: [], mesclasses: [], absenceClasses: [] };
 }
 
 function init() {
@@ -1107,7 +1138,140 @@ function getTodayStr() {
 
 function togglePresenceClass(classId) {
   const block = document.getElementById(`presblock-${classId}`);
-  if (block) block.classList.toggle('open');
+  if (!block) return;
+  block.classList.toggle('open');
+  if (block.classList.contains('open')) loadPresenceHistory(classId);
+}
+
+// ── Historique des séances précédentes (chargé à l'ouverture de la classe) ──
+function escHtml(s) {
+  return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
+}
+
+function formatHistDate(dateStr) {
+  const [y, m, d] = dateStr.split('-');
+  return `${d}/${m}/${y.slice(2)}`;
+}
+
+function histMaterialHtml(s) {
+  const parts = [];
+  if (s.chapitre !== '' && s.chapitre != null) parts.push(`פרק ${escHtml(s.chapitre)}`);
+  if (s.lecon) parts.push(escHtml(s.lecon));
+  return parts.length ? parts.join(' · ') : '<span class="muted">לא צוין חומר</span>';
+}
+
+async function loadPresenceHistory(classId, force) {
+  const cls = state.classes.find(c => c.id === classId);
+  if (!cls) return;
+  const cached = state.presenceHistory[classId];
+  if (cached && !force) { renderPresenceHistory(classId); return; }
+  if (cached === 'loading') return;
+  state.presenceHistory[classId] = 'loading';
+  const el = document.getElementById(`pres-hist-${classId}`);
+  if (el) el.innerHTML = `<div class="pres-hist-empty">⏳ טוען היסטוריית שיעורים...</div>`;
+  try {
+    const formula = encodeURIComponent(`{Classes}="${String(cls.num).replace(/"/g,'\\"')}"`);
+    const fields = [FLD_PRES_ELEVE, FLD_PRES_DATE, FLD_PRES_PRESENT, FLD_PRES_PROF, FLD_PRES_CHAPITRE, FLD_PRES_LECON, FLD_PRES_MOTIF]
+      .map(f => `&fields%5B%5D=${f}`).join('');
+    const recs = await getAll(BASE_COURS, TABLE_PRESENCES_JOUR, `?filterByFormula=${formula}&returnFieldsByFieldId=true${fields}`);
+    // Regrouper par jour de séance
+    const byDate = {};
+    for (const r of recs) {
+      const f = r.fields;
+      const date = String(f[FLD_PRES_DATE] || '').slice(0, 10);
+      if (!date) continue;
+      if (!byDate[date]) byDate[date] = { date, total: 0, present: 0, chapitre: '', lecon: '', prof: '', students: [] };
+      const s = byDate[date];
+      s.total++;
+      if (f[FLD_PRES_PRESENT]) s.present++;
+      if (s.chapitre === '' && f[FLD_PRES_CHAPITRE] != null && f[FLD_PRES_CHAPITRE] !== '') s.chapitre = f[FLD_PRES_CHAPITRE];
+      if (!s.lecon && f[FLD_PRES_LECON]) s.lecon = f[FLD_PRES_LECON];
+      if (!s.prof && f[FLD_PRES_PROF]) s.prof = f[FLD_PRES_PROF];
+      const sid = (f[FLD_PRES_ELEVE] || [])[0];
+      if (sid) s.students.push({ sid, present: !!f[FLD_PRES_PRESENT], motif: f[FLD_PRES_MOTIF] || '' });
+    }
+    // Récupérer les noms des élèves qui ne sont plus dans la classe (sinon on n'afficherait que leur ID)
+    const missing = [...new Set(Object.values(byDate).flatMap(s => s.students.map(x => x.sid)))].filter(id => !state.students[id]);
+    for (let i = 0; i < missing.length; i += 10) {
+      const batch = missing.slice(i, i + 10);
+      const f2 = encodeURIComponent(`OR(${batch.map(id => `RECORD_ID()="${id}"`).join(',')})`);
+      try {
+        const res = await api(BASE_COURS, TABLE_STUDENTS, `?filterByFormula=${f2}`);
+        for (const r of (res.records || [])) state.students[r.id] = (r.fields['Name'] || r.id).trim();
+      } catch (e) { /* noms manquants : on affichera "?" */ }
+    }
+    state.presenceHistory[classId] = Object.values(byDate).sort((a, b) => b.date.localeCompare(a.date)); // tri côté client
+  } catch (e) {
+    delete state.presenceHistory[classId];
+    if (el) el.innerHTML = `<div class="pres-hist-empty">⚠️ לא ניתן לטעון את ההיסטוריה</div>`;
+    return;
+  }
+  renderPresenceHistory(classId);
+}
+
+// Détail d'une séance : présents / absents (avec motif)
+function histDetailHtml(classId, s) {
+  const byName = (a, b) => (state.students[a.sid] || '').localeCompare(state.students[b.sid] || '', 'he');
+  const nameOf = x => escHtml(state.students[x.sid] || '?');
+  const presents = s.students.filter(x => x.present).sort(byName);
+  const absents  = s.students.filter(x => !x.present).sort(byName);
+  let html = `<div class="pres-hist-detail">`;
+  if (s.prof) html += `<div class="pres-hist-detail-line"><b>מורה:</b> ${escHtml(s.prof)}</div>`;
+  html += `<div class="pres-hist-detail-line"><b>חומר:</b> ${histMaterialHtml(s)}</div>`;
+  html += `<div class="pres-hist-detail-title ok">✓ נוכחים (${presents.length})</div>`;
+  html += presents.length ? `<div class="pres-hist-names">${presents.map(nameOf).join(' · ')}</div>` : `<div class="pres-hist-names muted">—</div>`;
+  html += `<div class="pres-hist-detail-title ko">✗ נעדרים (${absents.length})</div>`;
+  html += absents.length
+    ? `<ul class="pres-hist-absents">${absents.map(x => `<li>${nameOf(x)}${x.motif ? ` <span class="muted">— ${escHtml(x.motif)}</span>` : ''}</li>`).join('')}</ul>`
+    : `<div class="pres-hist-names muted">—</div>`;
+  html += `<button type="button" class="pres-hist-edit" onclick="openHistSessionForEdit('${classId}','${s.date}')">✏️ פתיחת השיעור לעריכה</button>`;
+  html += `</div>`;
+  return html;
+}
+
+function toggleHistRow(rowEl) {
+  rowEl.classList.toggle('open');
+}
+
+// Charger une séance passée dans le formulaire (pour la corriger)
+async function openHistSessionForEdit(classId, dateStr) {
+  const dateEl = document.getElementById(`pres-date-${classId}`);
+  if (!dateEl) return;
+  dateEl.value = dateStr;
+  await loadAndRenderPresenceChecklist(classId, dateStr);
+  dateEl.scrollIntoView({ behavior: 'smooth', block: 'center' });
+}
+
+function renderPresenceHistory(classId) {
+  const el = document.getElementById(`pres-hist-${classId}`);
+  const sessions = state.presenceHistory[classId];
+  if (!el || !Array.isArray(sessions)) return;
+  const selectedDate = document.getElementById(`pres-date-${classId}`)?.value || getTodayStr();
+  // Séances précédentes = strictement avant la date sélectionnée
+  const previous = sessions.filter(s => s.date < selectedDate);
+  if (!previous.length) {
+    el.innerHTML = `<div class="pres-hist-empty">📖 אין שיעורים קודמים רשומים לכיתה זו</div>`;
+    return;
+  }
+  const last = previous[0];
+  const myName = state.teacher ? state.teacher.name : '';
+  const rows = previous.map(s => `
+    <div class="pres-hist-item">
+      <div class="pres-hist-row" onclick="toggleHistRow(this.parentElement)">
+        <div class="pres-hist-date">${formatHistDate(s.date)}</div>
+        <div class="pres-hist-content">${histMaterialHtml(s)}${s.prof && s.prof !== myName ? `<span class="pres-hist-prof">👤 ${escHtml(s.prof)}</span>` : ''}</div>
+        <div class="pres-hist-count">${s.present}/${s.total} ✓ <span class="pres-hist-chev">▾</span></div>
+      </div>
+      ${histDetailHtml(classId, s)}
+    </div>`).join('');
+  const wasExpanded = el.classList.contains('expanded');
+  el.innerHTML = `
+    <div class="pres-hist-last">
+      <span class="pres-hist-last-label">📖 השיעור הקודם (${formatHistDate(last.date)}):</span>
+      <span>${histMaterialHtml(last)}</span>
+    </div>
+    <button type="button" class="pres-hist-toggle" onclick="document.getElementById('pres-hist-${classId}').classList.toggle('expanded'); this.textContent = this.textContent.startsWith('▾') ? '▴ הסתרת ההיסטוריה' : '▾ כל השיעורים הקודמים (${previous.length})';">${wasExpanded ? '▴ הסתרת ההיסטוריה' : `▾ כל השיעורים הקודמים (${previous.length})`}</button>
+    <div class="pres-hist-list">${rows}</div>`;
 }
 
 function buildStudentChecklist(cls, existingMap) {
@@ -1138,6 +1302,9 @@ function toggleMotifField(classId, sid) {
 
 function renderPresenceTab() {
   setTab('presence', buildPresenceHtml());
+  // Charger l'historique de la classe ouverte par défaut (les autres : à l'ouverture)
+  const firstOpen = document.querySelector('#tab-presence .classe-block.open');
+  if (firstOpen) loadPresenceHistory(firstOpen.id.replace('presblock-', ''));
 }
 
 function buildPresenceHtml() {
@@ -1171,6 +1338,7 @@ function buildPresenceHtml() {
         <span class="chevron">▾</span>
       </div>
       <div class="classe-body">
+        <div class="pres-history" id="pres-hist-${cls.id}"><div class="pres-hist-empty">⏳ טוען היסטוריית שיעורים...</div></div>
         <div class="infos-classe">
           <div class="infos-grid">
             <div class="field-group" style="max-width:200px;">
@@ -1258,6 +1426,7 @@ async function loadAndRenderPresenceChecklist(classId, dateStr) {
   const badge = document.getElementById(`pres-status-${classId}`);
   const anyDone = Object.keys(existingMap).length > 0;
   if (badge) badge.style.display = anyDone ? 'inline-block' : 'none';
+  renderPresenceHistory(classId); // "séance précédente" relative à la date choisie
 }
 
 async function submitPresence(classId) {
@@ -1302,6 +1471,7 @@ async function submitPresence(classId) {
       await api(BASE_COURS, TABLE_PRESENCES_JOUR, '', 'POST', { records: toCreate.slice(i, i + 10) });
     }
     await loadAndRenderPresenceChecklist(classId, dateStr);
+    loadPresenceHistory(classId, true); // rafraîchir l'historique avec la séance enregistrée
     if (dateStr === getTodayStr()) {
       state.presenceRecordsToday[classId] = state.presenceCache[classId].existingMap;
       state.presenceMeta[classId] = { chapitre: chapitreVal != null ? chapitreVal : '', lecon: leconVal };
