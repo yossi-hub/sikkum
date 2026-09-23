@@ -97,6 +97,19 @@ button.primary:hover{background:var(--orange-dk);border-color:var(--orange-dk);}
 .verdict ul{margin:12px 0 0;padding-left:18px;}
 .verdict li{font-size:14px;line-height:1.5;margin-bottom:8px;}
 
+.sendbox{margin-top:20px;padding-top:18px;border-top:1px solid rgba(0,0,0,.12);}
+.sendtitle{font-weight:600;font-size:14.5px;margin:0 0 12px;text-align:center;}
+.sendtitle.ok{color:var(--blue);font-family:var(--display);font-weight:800;font-size:20px;}
+.sendrow{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;}
+.sendrow input{flex:1 1 220px;max-width:280px;font-family:var(--sans);font-size:15px;padding:11px 14px;border:2px solid var(--ink);border-radius:9px;background:#fff;color:var(--ink);}
+.sendrow input:focus{outline:none;border-color:var(--blue);}
+.sendrow button{background:var(--orange);border-color:var(--orange);color:#fff;}
+.sendrow button:hover{background:var(--orange-dk);border-color:var(--orange-dk);}
+.sendrow button:disabled{opacity:.6;cursor:default;}
+.sendok{display:flex;gap:8px;align-items:flex-start;max-width:420px;margin:12px auto 0;font-size:12px;line-height:1.45;color:var(--muted);}
+.sendok input{margin-top:2px;flex:0 0 auto;}
+.sendmsg{min-height:18px;margin:10px 0 0;font-size:12.5px;text-align:center;color:var(--orange);}
+.sendmsg.ok{color:var(--muted);}
 .verdict .share{display:block;margin:18px auto 0;background:var(--ink);border-color:var(--ink);color:#fff;}
 .verdict .share:hover{background:var(--orange);border-color:var(--orange);}
 .verdict .share:disabled{opacity:.6;cursor:default;}
@@ -280,8 +293,7 @@ document.getElementById("done").addEventListener("click",()=>{
     }
   }
   if(total){
-    v.insertAdjacentHTML("beforeend",'<button class="share" id="share">Partager en story</button>');
-    document.getElementById("share").addEventListener("click",shareStory);
+    sendForm();
     prepareStory();
   }
   v.scrollIntoView({behavior:"smooth",block:"center"});
@@ -377,9 +389,8 @@ function buildStory(){
 }
 
 let storyBlob=null, storyBusy=false;
+const WEBHOOK="https://hook.eu1.make.com/amek1ytqx97tqcvbpe7t68e73gbkq8an";
 
-/* Prépare l'image à l'avance : le clic doit pouvoir partager immédiatement,
-   sinon le navigateur considère que le geste utilisateur a expiré. */
 async function prepareStory(){
   storyBlob=null; storyBusy=true;
   try{ if(document.fonts&&document.fonts.ready) await document.fonts.ready; }catch(e){}
@@ -390,62 +401,63 @@ async function prepareStory(){
   storyBusy=false;
 }
 
-function showInstagram(){
-  if(document.getElementById("igo")) return;
+function sendForm(){
   const v=document.getElementById("verdict");
-  const a=document.createElement("a");
-  a.id="igo";a.className="igo";a.href="instagram://story-camera";
-  a.textContent="Ouvrir Instagram";
-  a.addEventListener("click",()=>{ setTimeout(()=>{ location.href="https://www.instagram.com/"; },1200); });
-  const p=document.createElement("p");
-  p.className="ightxt";p.textContent="Image enregistrée dans ta galerie. Ouvre Instagram, choisis-la, et tague @electionsisraeliennes.";
-  v.appendChild(p);v.appendChild(a);
+  if(document.getElementById("sendbox")) return;
+  const box=document.createElement("div");
+  box.id="sendbox";box.className="sendbox";
+  box.innerHTML=
+    '<p class="sendtitle">Envoie ta coalition — on la publie et on la commente sur le compte.</p>'+
+    '<div class="sendrow">'+
+      '<input id="handle" type="text" inputmode="text" autocomplete="off" spellcheck="false" placeholder="@toncompte" maxlength="40">'+
+      '<button type="button" id="sendbtn">Envoyer</button>'+
+    '</div>'+
+    '<label class="sendok"><input type="checkbox" id="consent"> J\'accepte que ma coalition et mon compte soient publiés par @electionsisraeliennes.</label>'+
+    '<p class="sendmsg" id="sendmsg"></p>';
+  v.appendChild(box);
+  document.getElementById("sendbtn").addEventListener("click",submitCoalition);
 }
 
-function saveViaLink(blob,btn){
+function msg(t,ok){
+  const m=document.getElementById("sendmsg");
+  if(m){ m.textContent=t; m.className="sendmsg"+(ok?" ok":""); }
+}
+
+async function submitCoalition(){
+  const btn=document.getElementById("sendbtn");
+  const handle=(document.getElementById("handle").value||"").trim();
+  const consent=document.getElementById("consent").checked;
+  if(!handle){ msg("Indique ton compte Instagram pour qu'on puisse te taguer."); return; }
+  if(!consent){ msg("Coche la case pour autoriser la publication."); return; }
+
+  btn.disabled=true; msg("Envoi en cours…");
+  if(!storyBlob) await prepareStory();
+  if(!storyBlob){ btn.disabled=false; msg("L'image n'a pas pu être générée. Réessaie."); return; }
+
+  const chosen=PARTIES.filter(p=>sel.has(p.id));
+  const total=chosen.reduce((s,p)=>s+p.s,0);
+  const fr=(typeof frictions==="function")?frictions():[];
+  const verdict = total<61 ? ("Il manque "+(61-total)+" sièges")
+                : (fr.length ? "Majorité atteinte mais coalition incompatible" : "Gouvernement formable");
+
+  const fd=new FormData();
+  fd.append("handle", handle.startsWith("@")?handle:"@"+handle);
+  fd.append("total", String(total));
+  fd.append("verdict", verdict);
+  fd.append("parties", chosen.map(p=>p.n+" ("+p.s+")").join(", "));
+  fd.append("date", new Date().toISOString());
+  fd.append("image", storyBlob, "coalition.png");
+
   try{
-    const u=URL.createObjectURL(blob),a=document.createElement("a");
-    a.href=u;a.download="ma-coalition.png";document.body.appendChild(a);a.click();a.remove();
-    setTimeout(()=>URL.revokeObjectURL(u),6000);
-    if(btn) btn.textContent="Image enregistrée";
-    showInstagram();
-  }catch(e){ if(btn) btn.textContent="Échec de l'enregistrement"; }
-}
-
-function shareStory(){
-  const btn=document.getElementById("share");
-  if(!storyBlob){
-    if(btn) btn.textContent = storyBusy ? "Préparation…" : "Réessaie dans 1 s";
-    prepareStory();
-    return;
+    const r=await fetch(WEBHOOK,{method:"POST",body:fd});
+    if(!r.ok) throw new Error(r.status);
+    document.getElementById("sendbox").innerHTML=
+      '<p class="sendtitle ok">C\'est envoyé — merci !</p>'+
+      '<p class="sendmsg ok">On publie une sélection de coalitions chaque semaine sur @electionsisraeliennes. Surveille tes notifications.</p>';
+  }catch(e){
+    btn.disabled=false;
+    msg("L'envoi a échoué. Vérifie ta connexion et réessaie.");
   }
-  const file=new File([storyBlob],"ma-coalition.png",{type:"image/png"});
-
-  /* 1. partage natif (mobile) — appelé sans aucun await préalable */
-  if(navigator.canShare&&navigator.canShare({files:[file]})){
-    navigator.share({files:[file],title:"Ma coalition"})
-      .then(()=>{ if(btn) btn.textContent="Partagé"; showInstagram(); })
-      .catch(err=>{
-        if(err&&err.name==="AbortError"){ if(btn) btn.textContent="Partager en story"; return; }
-        saveViaLink(storyBlob,btn);
-      });
-    return;
-  }
-
-  /* 2. visualiseur d'artefact Claude */
-  if(window.claude&&window.claude.use){
-    if(btn) btn.textContent="Préparation…";
-    window.claude.use("downloads").then(dl=>{
-      if(!dl) return saveViaLink(storyBlob,btn);
-      dl.save({filename:"ma-coalition.png",data:storyBlob})
-        .then(()=>{ if(btn) btn.textContent="Image enregistrée"; showInstagram(); })
-        .catch(()=>{ if(btn) btn.textContent="Partager en story"; });
-    }).catch(()=>saveViaLink(storyBlob,btn));
-    return;
-  }
-
-  /* 3. ordinateur : téléchargement direct */
-  saveViaLink(storyBlob,btn);
 }
 
 </script>
