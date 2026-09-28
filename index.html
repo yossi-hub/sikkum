@@ -145,6 +145,11 @@ select.passage:focus { outline: none; border-color: #025db8; }
 .pres-hist-prof { display: block; font-size: 11.5px; color: #888; }
 .pres-hist-count { font-size: 12px; color: #1d8653; font-weight: 600; white-space: nowrap; direction: ltr; }
 
+/* Récap des classes terminées (bas de l'onglet נוכחות) */
+.pres-done-section { margin-top: 1.5rem; }
+.classe-block.done-class .classe-header { background: #6b7280; }
+.classe-block.done-class.open { border-color: #6b7280; }
+
 /* ── ONGLET 2 : BAKASHA ── */
 .bakasha-card { background: #FFF9F2; border: 0.5px solid rgba(2,93,184,0.15); border-radius: 12px; padding: 2rem 1.75rem; max-width: 680px; margin: 0 auto; }
 .bakasha-title { font-family: 'League Spartan', sans-serif; font-size: 20px; font-weight: 700; color: #025db8; margin-bottom: 4px; }
@@ -1333,8 +1338,18 @@ async function loadPresenceHistory(classId, force) {
   renderPresenceHistory(classId);
 }
 
+// ── Récap d'une classe terminée (lecture seule) ──
+function toggleDoneClassesSection() {
+  const body = document.getElementById('pres-done-body');
+  const chevron = document.getElementById('pres-done-chevron');
+  if (!body) return;
+  const isOpen = body.style.display !== 'none';
+  body.style.display = isOpen ? 'none' : 'block';
+  if (chevron) chevron.style.transform = isOpen ? 'rotate(0deg)' : 'rotate(180deg)';
+}
+
 // Détail d'une séance : présents / absents (avec motif)
-function histDetailHtml(classId, s) {
+function histDetailHtml(classId, s, readOnly) {
   const byName = (a, b) => (state.students[a.sid] || '').localeCompare(state.students[b.sid] || '', 'he');
   const nameOf = x => escHtml(state.students[x.sid] || '?');
   const presents = s.students.filter(x => x.present).sort(byName);
@@ -1348,7 +1363,7 @@ function histDetailHtml(classId, s) {
   html += absents.length
     ? `<ul class="pres-hist-absents">${absents.map(x => `<li>${nameOf(x)}${x.motif ? ` <span class="muted">— ${escHtml(x.motif)}</span>` : ''}</li>`).join('')}</ul>`
     : `<div class="pres-hist-names muted">—</div>`;
-  html += `<button type="button" class="pres-hist-edit" onclick="openHistSessionForEdit('${classId}','${s.date}')">✏️ פתיחת השיעור לעריכה</button>`;
+  if (!readOnly) html += `<button type="button" class="pres-hist-edit"onclick="openHistSessionForEdit('${classId}','${s.date}')">✏️ פתיחת השיעור לעריכה</button>`;
   html += `</div>`;
   return html;
 }
@@ -1367,6 +1382,8 @@ async function openHistSessionForEdit(classId, dateStr) {
 }
 
 function renderPresenceHistory(classId) {
+  const clsH = state.classes.find(c => c.id === classId);
+  const isDone = !!(clsH && clsH.status === 'Complete'); // classe terminée : lecture seule
   const el = document.getElementById(`pres-hist-${classId}`);
   const sessions = state.presenceHistory[classId];
   if (!el || !Array.isArray(sessions)) return;
@@ -1374,7 +1391,7 @@ function renderPresenceHistory(classId) {
   // Séances précédentes = strictement avant la date sélectionnée
   const previous = sessions.filter(s => s.date < selectedDate);
   if (!previous.length) {
-    el.innerHTML = `<div class="pres-hist-empty">📖 אין שיעורים קודמים רשומים לכיתה זו</div>`;
+    el.innerHTML = `<div class="pres-hist-empty">📖 ${isDone ? 'לא נרשמה נוכחות לכיתה זו' : 'אין שיעורים קודמים רשומים לכיתה זו'}</div>`;
     return;
   }
   const last = previous[0];
@@ -1386,12 +1403,12 @@ function renderPresenceHistory(classId) {
         <div class="pres-hist-content">${histMaterialHtml(s)}${s.prof && s.prof !== myName ? `<span class="pres-hist-prof">👤 ${escHtml(s.prof)}</span>` : ''}</div>
         <div class="pres-hist-count">${s.present}/${s.total} ✓ <span class="pres-hist-chev">▾</span></div>
       </div>
-      ${histDetailHtml(classId, s)}
+      ${histDetailHtml(classId, s, isDone)}
     </div>`).join('');
   const wasExpanded = el.classList.contains('expanded');
   el.innerHTML = `
     <div class="pres-hist-last">
-      <span class="pres-hist-last-label">📖 השיעור הקודם (${formatHistDate(last.date)}):</span>
+      <span class="pres-hist-last-label">📖 ${isDone ? 'השיעור האחרון' : 'השיעור הקודם'} (${formatHistDate(last.date)}):</span>
       <span>${histMaterialHtml(last)}</span>
     </div>
     <button type="button" class="pres-hist-toggle" onclick="document.getElementById('pres-hist-${classId}').classList.toggle('expanded'); this.textContent = this.textContent.startsWith('▾') ? '▴ הסתרת ההיסטוריה' : '▾ כל השיעורים הקודמים (${previous.length})';">${wasExpanded ? '▴ הסתרת ההיסטוריה' : `▾ כל השיעורים הקודמים (${previous.length})`}</button>
@@ -1495,6 +1512,36 @@ function buildPresenceHtml() {
       <input type="text" class="field-input" id="remp-search" placeholder="מספר כיתה... (ex: 214)" oninput="onRemplacementSearch()" style="direction:ltr;" />
       <div id="remp-results" style="margin-top:10px;"></div>
     </div>`;
+
+  // ── Récap des classes terminées (lecture seule) ──
+  const doneClasses = state.classes.filter(c => c.status === 'Complete');
+  if (doneClasses.length) {
+    html += `
+    <div class="mesclasses-accordion pres-done-section">
+      <div class="mesclasses-accordion-header" onclick="toggleDoneClassesSection()">
+        <span>📁 כיתות שהסתיימו — היסטוריית נוכחות (${doneClasses.length})</span>
+        <span class="chevron" id="pres-done-chevron">▾</span>
+      </div>
+      <div class="mesclasses-accordion-body" id="pres-done-body" style="display:none;">
+        ${doneClasses.map(cls => `
+        <div class="classe-block done-class" id="presblock-${cls.id}">
+          <div class="classe-header" onclick="togglePresenceClass('${cls.id}')">
+            <div class="classe-header-left">
+              <div class="classe-title">כיתה ${cls.num}</div>
+              <div class="classe-tags">
+                <span class="tag">${cls.studentIds.length} תלמידים</span>
+                <span class="tag">✔ הסתיימה</span>
+              </div>
+            </div>
+            <span class="chevron">▾</span>
+          </div>
+          <div class="classe-body">
+            <div class="pres-history" id="pres-hist-${cls.id}" style="margin-bottom:1rem;"><div class="pres-hist-empty">⏳ טוען היסטוריית שיעורים...</div></div>
+          </div>
+        </div>`).join('')}
+      </div>
+    </div>`;
+  }
 
   return html;
 }
