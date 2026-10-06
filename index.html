@@ -14,6 +14,9 @@ body { font-family: 'Poppins', -apple-system, sans-serif; background: #f0ede8; c
 .logo { font-family: 'League Spartan', sans-serif; font-weight: 700; font-size: 24px; color: #fff; line-height: 1.1; }
 .logo span { display: block; }
 .logo .lavi { padding-right: 20px; }
+.logo.clickable { cursor: pointer; transition: opacity .15s; }
+.logo.clickable:hover { opacity: 0.85; }
+.logo.clickable:focus-visible { outline: 2px solid rgba(255,255,255,0.7); outline-offset: 4px; border-radius: 4px; }
 .header-right { text-align: left; direction: ltr; }
 .header-title { color: #fff; font-family: 'League Spartan', sans-serif; font-size: 15px; font-weight: 600; }
 .header-sub { color: rgba(255,255,255,0.65); font-size: 12px; margin-top: 2px; }
@@ -269,7 +272,8 @@ table.contact-table { width: 100%; border-collapse: collapse; font-size: 12.5px;
 <body>
 <div class="page">
   <div class="app-header">
-    <div class="logo">
+    <div class="logo clickable" role="link" tabindex="0" title="Retour à l'accueil"
+         onclick="goHome()" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();goHome();}">
       <span>Oulpan</span>
       <span class="lavi">Lavi</span>
     </div>
@@ -672,6 +676,13 @@ function logout() {
 }
 
    ══════════════════════════════════════════════════════════════════ */
+
+// Clic sur le logo : retour à l'écran d'accueil du prof connecté
+function goHome() {
+  if (!state.teacher || classesLoading) return;
+  renderWelcome();
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
 
 function renderWelcome() {
   hideTabs();
