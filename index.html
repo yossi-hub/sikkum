@@ -4,8 +4,12 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Lavi's Teacher App</title>
-<link href="https://fonts.googleapis.com/css2?family=League+Spartan:wght@400;500;700&family=Poppins:wght@400;500&display=swap" rel="stylesheet" />
-<script src="https://accounts.google.com/gsi/client"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link rel="preconnect" href="https://api.airtable.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=League+Spartan:wght@400;500;700&family=Poppins:wght@400;500&display=swap" rel="stylesheet" media="print" onload="this.media='all'" />
+<!-- Chargé sans bloquer l'affichage : initGoogleSignIn() attend que le script soit prêt -->
+<script src="https://accounts.google.com/gsi/client" async></script>
 <style>
 * { box-sizing: border-box; margin: 0; padding: 0; }
 body { font-family: 'Poppins', -apple-system, sans-serif; background: #f0ede8; color: #2e2e2e; direction: rtl; min-height: 100vh; }
@@ -419,17 +423,59 @@ let remplacementSelected = null;
 let sessionId = 0;          // incrémenté à chaque init/déconnexion : invalide les chargements en cours
 let classesLoading = false; // évite de relancer un chargement déjà en cours
 let classesLoaded = false;  // vrai une fois les classes chargées avec succès
+let classesPromise = null;  // chargement des classes en cours (préchargement)
 let state = { teacher: null, classes: [], students: {}, presences: {}, rapportRecords: {}, presenceRecordsToday: {}, presenceCache: {}, presenceMeta: {}, presenceHistory: {}, annuaire: [], mesclasses: [], absenceClasses: [] };
 
 // ── API ──
+// Airtable limite à 5 requêtes / seconde par base : on espace les départs
+// pour pouvoir lancer des requêtes en parallèle sans se faire bloquer (erreur 429).
+const _rateSlots = {};
+async function waitRateSlot(base) {
+  const slots = _rateSlots[base] || (_rateSlots[base] = []);
+  while (true) {
+    const now = Date.now();
+    while (slots.length && now - slots[0] >= 1050) slots.shift();
+    if (slots.length < 5) { slots.push(now); return; }
+    await new Promise(r => setTimeout(r, 1050 - (now - slots[0])));
+  }
+}
+
 async function api(base, table, params='', method='GET', body=null) {
   const url = `https://api.airtable.com/v0/${base}/${table}${params}`;
   const opts = { method: method || 'GET', headers: { 'Authorization': 'Bearer ' + AIRTABLE_KEY, 'Content-Type': 'application/json' } };
   if (body) opts.body = JSON.stringify(body);
-  const res = await fetch(url, opts);
-  const data = await res.json();
-  if (!res.ok) throw new Error(JSON.stringify(data));
-  return data;
+  for (let attempt = 0; ; attempt++) {
+    await waitRateSlot(base);
+    const res = await fetch(url, opts);
+    if (res.status === 429 && attempt < 3) { await new Promise(r => setTimeout(r, 1500 * (attempt + 1))); continue; }
+    const data = await res.json();
+    if (!res.ok) throw new Error(JSON.stringify(data));
+    return data;
+  }
+}
+
+// Exécute fn sur chaque élément, au plus `limit` à la fois (résultats dans l'ordre)
+async function mapLimit(items, limit, fn) {
+  const results = new Array(items.length);
+  let next = 0;
+  const worker = async () => { while (next < items.length) { const i = next++; results[i] = await fn(items[i], i); } };
+  await Promise.all(Array.from({ length: Math.min(limit, items.length) }, worker));
+  return results;
+}
+
+function chunk(arr, size) {
+  const out = [];
+  for (let i = 0; i < arr.length; i += size) out.push(arr.slice(i, i + size));
+  return out;
+}
+
+// Noms des élèves (par paquets, en parallèle) — remplit `target` : { recordId: nom }
+async function fetchStudentNames(ids, target) {
+  await mapLimit(chunk(ids, 30), 3, async batch => {
+    const f = encodeURIComponent(`OR(${batch.map(id => `RECORD_ID()="${id}"`).join(',')})`);
+    const res = await api(BASE_COURS, TABLE_STUDENTS, `?filterByFormula=${f}&fields%5B%5D=Name`);
+    for (const r of (res.records || [])) target[r.id] = (r.fields['Name'] || r.id).trim();
+  });
 }
 
 async function getAll(base, table, params='') {
@@ -532,6 +578,7 @@ function renderHeaderDefault() {
 function resetTeacherState() {
   sessionId++;          // invalide tout chargement encore en cours
   classesLoading = false;
+  classesPromise = null;
   classesLoaded = false;
   annuaireLoading = false;
   annuaireLoaded = false;
@@ -545,12 +592,102 @@ function resetTeacherState() {
   state = { teacher: null, classes: [], students: {}, presences: {}, rapportRecords: {}, presenceRecordsToday: {}, presenceCache: {}, presenceMeta: {}, presenceHistory: {}, annuaire: [], mesclasses: [], absenceClasses: [] };
 }
 
+// ── SESSION MÉMORISÉE (rester connecté sur cet appareil) ──
+const SESSION_KEY = 'lavi_session_v1';
+const SESSION_DAYS = 60; // durée max sans revenir sur l'app
+
+function readSession() {
+  try {
+    const s = JSON.parse(localStorage.getItem(SESSION_KEY) || 'null');
+    if (!s || !s.email || Date.now() - (s.ts || 0) > SESSION_DAYS * 86400000) return null;
+    return s;
+  } catch (e) { return null; }
+}
+
+function writeSession(extra) {
+  try {
+    const prev = readSession() || {};
+    localStorage.setItem(SESSION_KEY, JSON.stringify({ ...prev, ...extra, ts: Date.now() }));
+  } catch (e) { /* stockage indisponible : on se reconnectera la prochaine fois */ }
+}
+
+function clearSession() {
+  try { localStorage.removeItem(SESSION_KEY); } catch (e) {}
+}
+
+function saveTeacherSession() {
+  if (!state.teacher) return;
+  writeSession({
+    email: adminSessionActive ? adminSessionEmail : state.teacher.email.trim().toLowerCase(),
+    teacherEmail: state.teacher.email.trim().toLowerCase(),
+    teacher: state.teacher,
+    hidden: [...hiddenTabsSet],
+    isAdmin: !!adminSessionActive
+  });
+}
+
+// Au démarrage : si une session existe, on affiche tout de suite l'accueil
+// (à partir des infos mémorisées) puis on rafraîchit discrètement en arrière-plan.
+function restoreSession() {
+  const s = readSession();
+  if (!s) return false;
+  const isAdmin = !!s.isAdmin || SUPER_ADMIN_EMAILS.includes(s.email);
+  if (isAdmin) { adminSessionActive = true; adminSessionEmail = s.email; }
+  if (!s.teacher) {
+    // Admin qui n'avait pas encore choisi de prof
+    if (!adminSessionActive) return false;
+    loadAdminEmails().then(() => {
+      if (!isAdminEmail(s.email)) { logout(); return; }
+      showAdminPicker();
+    });
+    return true;
+  }
+  state.teacher = s.teacher;
+  hiddenTabsSet = new Set(s.hidden || []);
+  renderTabsBar();
+  renderHeaderUser(state.teacher);
+  renderWelcome();
+  writeSession({}); // prolonge la session
+  refreshRestoredSession(s);
+  return true;
+}
+
+async function refreshRestoredSession(s) {
+  const mySession = sessionId;
+  try {
+    const [found] = await Promise.all([
+      findTeacherByEmail(s.teacherEmail),
+      loadHiddenTabs(),
+      adminSessionActive ? loadAdminEmails() : Promise.resolve()
+    ]);
+    if (mySession !== sessionId) return;
+    if (adminSessionActive && !isAdminEmail(s.email)) { logout(); return; }
+    if (!found) { logout(); return; } // le prof n'existe plus : retour à la connexion
+    const fresh = { id: found.id, name: (found.fields['Name'] || '').trim(), email: found.fields['Email'] || '', classIds: found.fields['Classes 5786'] || [] };
+    const classesChanged = JSON.stringify(fresh.classIds) !== JSON.stringify(state.teacher.classIds);
+    const visibleChanged = JSON.stringify([...hiddenTabsSet].sort()) !== JSON.stringify([...(s.hidden || [])].sort())
+                        || fresh.name !== state.teacher.name;
+    Object.assign(state.teacher, fresh); // même objet : les chargements en cours restent valides
+    if (classesChanged && !classesLoading) { classesPromise = null; classesLoaded = false; }
+    if (visibleChanged) {
+      renderTabsBar();
+      renderHeaderUser(state.teacher);
+      if (document.querySelector('.welcome-screen')) renderWelcome();
+    }
+    saveTeacherSession();
+  } catch (e) {
+    // Pas de réseau ou erreur Airtable : on garde la version mémorisée
+  }
+  if (mySession === sessionId) prefetchClasses().catch(() => {});
+}
+
 function init() {
   adminSessionActive = false;
   adminSessionEmail = null;
   resetTeacherState();
   renderHeaderDefault();
   hideTabs();
+  if (restoreSession()) return;
   renderLogin();
 }
 
@@ -572,18 +709,20 @@ function renderLogin(err) {
       <div id="google-signin-btn" style="display:flex;justify-content:center;margin-top:0.5rem;"></div>
     </div>
   `);
-  initGoogleSignIn();
+  initGoogleSignIn(!err); // pas de reconnexion auto après une erreur (sinon boucle)
 }
 
-function initGoogleSignIn() {
+function initGoogleSignIn(allowAuto) {
   if (!window.google || !window.google.accounts || !window.google.accounts.id) {
-    setTimeout(initGoogleSignIn, 200);
+    setTimeout(() => initGoogleSignIn(allowAuto), 200);
     return;
   }
   google.accounts.id.initialize({
     client_id: GOOGLE_CLIENT_ID,
-    callback: handleGoogleCredential
+    callback: handleGoogleCredential,
+    auto_select: !!allowAuto // reconnexion automatique si le compte a déjà été utilisé sur cet appareil
   });
+  if (allowAuto) { try { google.accounts.id.prompt(); } catch (e) {} }
   const btnContainer = document.getElementById('google-signin-btn');
   if (btnContainer) {
     google.accounts.id.renderButton(btnContainer, {
@@ -625,6 +764,8 @@ async function handleGoogleCredential(response) {
     if (isAdminEmail(email)) {
       adminSessionActive = true;
       adminSessionEmail = email;
+      clearSession();
+      writeSession({ email, isAdmin: true });
       await showAdminPicker();
     } else {
       await loginByEmail(email);
@@ -635,6 +776,7 @@ async function handleGoogleCredential(response) {
 }
 
 function logout() {
+  clearSession();
   if (window.google && google.accounts && google.accounts.id) {
     google.accounts.id.disableAutoSelect();
   }
@@ -928,105 +1070,147 @@ async function selectAdminTeacher(email) {
   await loginByEmail(email);
 }
 
+async function findTeacherByEmail(email) {
+  try {
+    const f = encodeURIComponent(`LOWER(TRIM({Email}))="${email.replace(/"/g, '\\"')}"`);
+    const res = await api(BASE_COURS, TABLE_TEACHERS, `?filterByFormula=${f}`);
+    const hit = (res.records || []).find(r => (r.fields['Email'] || '').trim().toLowerCase() === email);
+    if (hit) return hit;
+  } catch (e) { /* repli ci-dessous */ }
+  const recs = await getAll(BASE_COURS, TABLE_TEACHERS, '');
+  return recs.find(r => (r.fields['Email'] || '').trim().toLowerCase() === email);
+}
+
 async function loginByEmail(emailArg) {
   const email = (emailArg || '').trim().toLowerCase();
   if (!email) return;
   loading('מתחבר...');
   try {
-    const recs  = await getAll(BASE_COURS, TABLE_TEACHERS, '');
-    const found = recs.find(r => (r.fields['Email'] || '').trim().toLowerCase() === email);
+    // On ne demande que la fiche du prof (au lieu de toute la table), en parallèle des réglages d'onglets
+    const [found] = await Promise.all([findTeacherByEmail(email), loadHiddenTabs()]);
     if (!found) {
       renderLogin('החשבון שלך מזוהה אך אינו רשום כמורה במערכת. אנא פנה/י להנהלה.');
       return;
     }
     state.teacher = { id: found.id, name: (found.fields['Name'] || '').trim(), email: found.fields['Email'] || '', classIds: found.fields['Classes 5786'] || [] };
-    await loadHiddenTabs();
     renderTabsBar();
     renderHeaderUser(state.teacher);
     renderWelcome();
+    saveTeacherSession(); // rester connecté sur cet appareil
+    // Préchargement en arrière-plan : quand le prof clique sur נוכחות, tout est souvent déjà prêt
+    prefetchClasses().catch(() => {});
   } catch(e) { setRoot(`<div class="error-msg">Erreur : ${e.message}</div>`); }
 }
 
 // ── CHARGEMENT ──
+// Récupère toutes les données des onglets סיכום / נוכחות, en parallèle.
+// Ne touche à `state` qu'à la fin, et seulement si le prof n'a pas changé entre-temps.
+function prefetchClasses() {
+  if (!state.teacher) return Promise.resolve(false);
+  if (!classesPromise) {
+    const mySession = sessionId;
+    classesPromise = fetchClassesData(mySession).catch(e => {
+      if (mySession === sessionId) classesPromise = null; // permettre un nouvel essai
+      throw e;
+    });
+  }
+  return classesPromise;
+}
+
+async function fetchClassesData(mySession) {
+  const teacher = state.teacher;
+  const todayStr = getTodayStr();
+
+  // 1) Les classes du prof : quelques requêtes groupées au lieu d'une par classe
+  const classRecs = {};
+  await mapLimit(chunk(teacher.classIds, 20), 3, async batch => {
+    const f = encodeURIComponent(`OR(${batch.map(id => `RECORD_ID()="${id}"`).join(',')})`);
+    const recs = await getAll(BASE_COURS, TABLE_CLASSES, `?filterByFormula=${f}`);
+    for (const r of recs) classRecs[r.id] = r;
+  });
+  const classes = [];
+  for (const cid of teacher.classIds) { // garder l'ordre d'origine
+    const r = classRecs[cid];
+    if (!r) continue;
+    const f = r.fields;
+    if (!['Complete', 'In Progress'].includes(f['Status'])) continue;
+    classes.push({ id: cid, num: f['Numéro de Classe'] || f['Name'] || cid, chapitre: f['Chapitre en cours'] || '', niveau: f['Niveau'] || '', studentIds: f['Students'] || [], status: f['Status'] || '' });
+  }
+  if (mySession !== sessionId) return false;
+
+  // 2) Tout le reste ne dépend que des classes : on lance tout en même temps
+  const students = {};
+  const presences = {};
+  const rapportRecords = {};
+  const newSent = {};
+  const presenceRecordsToday = {};
+  const presenceMeta = {};
+
+  const loadStudents = () => fetchStudentNames([...new Set(classes.flatMap(c => c.studentIds))], students);
+
+  const loadPresenceTotals = () => mapLimit(classes, 3, async cls => {
+    const formula = encodeURIComponent(`{Classe}="${cls.num}"`);
+    const res = await getAll(BASE_PRESENCE, TABLE_PRESENCE, `?filterByFormula=${formula}`);
+    for (const r of res) {
+      const n = (r.fields['Name'] || '').trim();
+      if (n) presences[`${n}__${cls.num}`] = r.fields['Nombre de présences'] || 0;
+    }
+  });
+
+  const loadRapports = async () => {
+    const formula = encodeURIComponent(`{Prof}="${teacher.name}"`);
+    const rapports = await getAll(BASE_COURS, TABLE_RAPPORTS, `?filterByFormula=${formula}&returnFieldsByFieldId=true`);
+    for (const cls of classes) {
+      const recs = rapports.filter(r => String(r.fields['fld5pPY7sfAzWNFJB'] || '').trim() === String(cls.num).trim());
+      if (recs.length) { newSent[cls.id] = 'sent'; rapportRecords[cls.id] = recs; }
+    }
+  };
+
+  const loadTodayPresences = async () => {
+    if (!classes.length) return;
+    const orParts = classes.map(c => `{Classes}="${String(c.num).replace(/"/g,'\\"')}"`).join(',');
+    const formulaPres = encodeURIComponent(`AND(IS_SAME({Date},"${todayStr}",'day'),OR(${orParts}))`);
+    const presRecs = await getAll(BASE_COURS, TABLE_PRESENCES_JOUR, `?filterByFormula=${formulaPres}&returnFieldsByFieldId=true`);
+    const numToClassId = {};
+    classes.forEach(c => { numToClassId[String(c.num).trim()] = c.id; });
+    for (const r of presRecs) {
+      const classId = numToClassId[String(r.fields[FLD_PRES_CLASSE] || '').trim()];
+      if (!classId) continue;
+      const sid = (r.fields[FLD_PRES_ELEVE] || [])[0];
+      if (!sid) continue;
+      if (!presenceRecordsToday[classId]) presenceRecordsToday[classId] = {};
+      presenceRecordsToday[classId][sid] = { recordId: r.id, present: !!r.fields[FLD_PRES_PRESENT], motif: r.fields[FLD_PRES_MOTIF] || '' };
+      if (!presenceMeta[classId]) {
+        presenceMeta[classId] = {
+          chapitre: r.fields[FLD_PRES_CHAPITRE] != null ? r.fields[FLD_PRES_CHAPITRE] : '',
+          lecon: r.fields[FLD_PRES_LECON] || ''
+        };
+      }
+    }
+  };
+
+  await Promise.all([loadStudents(), loadPresenceTotals(), loadRapports(), loadTodayPresences()]);
+  if (mySession !== sessionId || state.teacher !== teacher) return false;
+
+  // 3) Tout est arrivé : on enregistre d'un coup
+  state.classes = classes;
+  state.students = students;
+  state.presences = presences;
+  state.rapportRecords = rapportRecords;
+  sentClasses = newSent;
+  state.presenceRecordsToday = presenceRecordsToday;
+  state.presenceMeta = presenceMeta;
+  return true;
+}
+
 async function loadClasses(targetTab) {
   if (!state.teacher || classesLoading) return;
   const mySession = sessionId;
   classesLoading = true;
   loading('Chargement de vos classes...');
   try {
-    state.classes = []; state.students = {};
-    for (const cid of state.teacher.classIds) {
-      if (mySession !== sessionId) return; // déconnexion pendant le chargement
-      const cls = await api(BASE_COURS, TABLE_CLASSES, `/${cid}`);
-      const f = cls.fields;
-      if (!['Complete', 'In Progress'].includes(f['Status'])) continue;
-      state.classes.push({ id: cid, num: f['Numéro de Classe'] || f['Name'] || cid, chapitre: f['Chapitre en cours'] || '', niveau: f['Niveau'] || '', studentIds: f['Students'] || [], status: f['Status'] || '' });
-    }
-    const allStudentIds = [...new Set(state.classes.flatMap(c => c.studentIds))];
-    for (let i = 0; i < allStudentIds.length; i += 10) {
-      if (mySession !== sessionId) return;
-      const batch = allStudentIds.slice(i, i + 10);
-      const formula = encodeURIComponent(`OR(${batch.map(id => `RECORD_ID()="${id}"`).join(',')})`);
-      const res = await api(BASE_COURS, TABLE_STUDENTS, `?filterByFormula=${formula}`);
-      for (const r of (res.records || [])) state.students[r.id] = (r.fields['Name'] || r.id).trim();
-    }
-    if (mySession !== sessionId) return;
-    loading('Chargement des présences...');
-    state.presences = {};
-    for (const cls of state.classes) {
-      if (mySession !== sessionId) return;
-      const formula = encodeURIComponent(`{Classe}="${cls.num}"`);
-      const res = await getAll(BASE_PRESENCE, TABLE_PRESENCE, `?filterByFormula=${formula}`);
-      for (const r of res) {
-        const n = (r.fields['Name'] || '').trim();
-        if (n) state.presences[`${n}__${cls.num}`] = r.fields['Nombre de présences'] || 0;
-      }
-    }
-
-    // ── vérifier dans TABLE_RAPPORTS quelles classes ont déjà été envoyées, et garder les enregistrements complets (pour édition ultérieure) ──
-    if (mySession !== sessionId || !state.teacher) return;
-    loading('Vérification des rapports existants...');
-    sentClasses = {};
-    state.rapportRecords = {};
-    const teacherName = state.teacher.name;
-    const formula = encodeURIComponent(`{Prof}="${teacherName}"`);
-    const rapports = await getAll(BASE_COURS, TABLE_RAPPORTS, `?filterByFormula=${formula}&returnFieldsByFieldId=true`);
-    for (const cls of state.classes) {
-      const recs = rapports.filter(r => String(r.fields['fld5pPY7sfAzWNFJB'] || '').trim() === String(cls.num).trim());
-      if (recs.length) {
-        sentClasses[cls.id] = 'sent';
-        state.rapportRecords[cls.id] = recs;
-      }
-    }
-
-    // ── vérifier les présences déjà enregistrées aujourd'hui (une seule requête pour toutes les classes) ──
-    if (mySession !== sessionId) return;
-    loading('Vérification des présences du jour...');
-    state.presenceRecordsToday = {};
-    state.presenceMeta = {};
-    const todayStr = getTodayStr();
-    if (state.classes.length) {
-      const orParts = state.classes.map(c => `{Classes}="${String(c.num).replace(/"/g,'\\"')}"`).join(',');
-      const formulaPres = encodeURIComponent(`AND(IS_SAME({Date},"${todayStr}",'day'),OR(${orParts}))`);
-      const presRecs = await getAll(BASE_COURS, TABLE_PRESENCES_JOUR, `?filterByFormula=${formulaPres}&returnFieldsByFieldId=true`);
-      const numToClassId = {};
-      state.classes.forEach(c => { numToClassId[String(c.num).trim()] = c.id; });
-      for (const r of presRecs) {
-        const classNum = String(r.fields[FLD_PRES_CLASSE] || '').trim();
-        const classId = numToClassId[classNum];
-        if (!classId) continue;
-        const sid = (r.fields[FLD_PRES_ELEVE] || [])[0];
-        if (!sid) continue;
-        if (!state.presenceRecordsToday[classId]) state.presenceRecordsToday[classId] = {};
-        state.presenceRecordsToday[classId][sid] = { recordId: r.id, present: !!r.fields[FLD_PRES_PRESENT], motif: r.fields[FLD_PRES_MOTIF] || '' };
-        if (!state.presenceMeta[classId]) {
-          state.presenceMeta[classId] = {
-            chapitre: r.fields[FLD_PRES_CHAPITRE] != null ? r.fields[FLD_PRES_CHAPITRE] : '',
-            lecon: r.fields[FLD_PRES_LECON] || ''
-          };
-        }
-      }
-    }
+    const ok = await prefetchClasses();
+    if (!ok || mySession !== sessionId) return;
 
     // Afficher les onglets et remplir le contenu, sans forcer le retour sur un onglet
     // si l'utilisateur a entre-temps navigué ailleurs pendant le chargement.
@@ -1332,14 +1516,8 @@ async function loadPresenceHistory(classId, force) {
     }
     // Récupérer les noms des élèves qui ne sont plus dans la classe (sinon on n'afficherait que leur ID)
     const missing = [...new Set(Object.values(byDate).flatMap(s => s.students.map(x => x.sid)))].filter(id => !state.students[id]);
-    for (let i = 0; i < missing.length; i += 10) {
-      const batch = missing.slice(i, i + 10);
-      const f2 = encodeURIComponent(`OR(${batch.map(id => `RECORD_ID()="${id}"`).join(',')})`);
-      try {
-        const res = await api(BASE_COURS, TABLE_STUDENTS, `?filterByFormula=${f2}`);
-        for (const r of (res.records || [])) state.students[r.id] = (r.fields['Name'] || r.id).trim();
-      } catch (e) { /* noms manquants : on affichera "?" */ }
-    }
+    try { await fetchStudentNames(missing, state.students); }
+    catch (e) { /* noms manquants : on affichera "?" */ }
     state.presenceHistory[classId] = Object.values(byDate).sort((a, b) => b.date.localeCompare(a.date)); // tri côté client
   } catch (e) {
     delete state.presenceHistory[classId];
