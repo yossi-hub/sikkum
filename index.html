@@ -391,11 +391,13 @@ const FLD_PARAMS_HIDDEN = 'fldfrqe9jhSeQ50vW';
 const PARAMS_RECORD_ID  = 'recRw31i389hBWXsX';
 const FLD_PARAMS_ADMINS = 'fldPl4DXdbAKlf47Y'; // Admins (texte long, un email par ligne)
 
+// NB : "label" sert de clé pour les onglets masqués (champ Airtable "Paramètres App") — ne pas le modifier
+// sans renommer aussi l'option dans Airtable. Le texte affiché est "title".
 const TAB_DEFS = {
   annuaire:   { label: 'אנשי צוות',       icon: '👥', title: 'אנשי צוות',       desc: "Annuaire de l'équipe Oulpan Lavi" },
   mesclasses: { label: 'הכיתות שלי',      icon: '🏫', title: 'הכיתות שלי',      desc: 'Détails complets de vos classes' },
   presence:   { label: 'נוכחות',          icon: '✅', title: 'נוכחות',          desc: 'Registre de présence — cocher les élèves présents' },
-  sikkum:     { label: 'דוח סיום שנה',    icon: '📋', title: 'דוח סיום שנה',    desc: "Rapport de fin d'année — évaluations et bilan par classe" },
+  sikkum:     { label: 'דוח סיום שנה',    icon: '📋', title: 'דוח סיום קורס',   desc: 'Rapport de fin de cours — évaluations et bilan par classe' },
   points:     { label: 'נקודות חשובות',   icon: '🔑', title: 'נקודות חשובות',   desc: 'Points importants et contacts utiles' },
   absence:    { label: 'דיווח היעדרות',   icon: '🤒', title: 'דיווח היעדרות',   desc: 'Déclarer une absence' },
   bakasha:    { label: 'בקשות לשנה הבאה', icon: '📝', title: 'בקשות לשנה הבאה', desc: "Vos préférences et demandes pour l'année 5787" }
