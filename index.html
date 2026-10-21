@@ -366,7 +366,7 @@ const FLD_CL_TYPE       = 'fldCuRG3sEcLnT5fK'; // Type
 const FLD_CL_ENDROIT    = 'fldaewXOB571FRk08'; // Endroit
 const FLD_CL_HOURS      = 'fldHQOhXxgk6fk5O6'; // Number of hours
 const FLD_CL_NIVEAU     = 'fld2E7XYUsEBuPBPx'; // Niveau
-const FLD_CL_CHAPITRE   = 'fld3BmH3tWRI68Vsr'; // Chapitre en cours
+const FLD_CL_CHAPITRE   = 'fldedo3AHC5u6o7pZ'; // Chapitre en cours (mis à jour automatiquement depuis פרק.שיעור)
 const FLD_CL_HORAIRES   = 'fldOT7CUfWymgpt6x'; // Horaires
 const FLD_CL_JOUR_TEXT  = 'fldBQEy5J44zTUtbJ'; // Jour (texte formaté, ex "lundi")
 const FLD_CL_DEBUTE     = 'fldRD4iUQikjM9IqI'; // Débute le
@@ -1829,6 +1829,30 @@ async function loadAndRenderPresenceChecklist(classId, dateStr) {
   renderPresenceHistory(classId); // "séance précédente" relative à la date choisie
 }
 
+// Met à jour "Chapitre en cours" (table Classes) avec le פרק.שיעור de la séance LA PLUS RÉCENTE.
+// On ne prend pas simplement la dernière saisie : si un prof remplit après coup une séance
+// passée, cela ne doit pas faire reculer le chapitre de la classe.
+async function syncChapitreEnCours(cls, savedDate, savedChapitre) {
+  try {
+    const hist = state.presenceHistory[cls.id];
+    let code = '';
+    if (Array.isArray(hist)) {
+      // historique trié du plus récent au plus ancien : 1re séance avec un code valide
+      const latest = hist.find(s => normalizeCours(s.chapitre));
+      if (latest) code = normalizeCours(latest.chapitre);
+    } else if (savedDate >= getTodayStr()) {
+      code = savedChapitre; // historique indisponible : on ne met à jour que pour la séance du jour
+    }
+    if (!code || code === cls.chapitre) return; // rien à changer
+    await api(BASE_COURS, TABLE_CLASSES, `/${cls.id}`, 'PATCH', { fields: { [FLD_CL_CHAPITRE]: code } });
+    cls.chapitre = code;
+    const mc = (state.mesclasses || []).find(c => c.id === cls.id);
+    if (mc) mc.chapitre = code;
+  } catch (e) {
+    console.warn('Mise à jour "Chapitre en cours" impossible :', e.message); // la présence est déjà enregistrée
+  }
+}
+
 async function submitPresence(classId) {
   const cls = state.classes.find(c => c.id === classId);
   if (!cls) return;
@@ -1886,7 +1910,9 @@ async function submitPresence(classId) {
     // (sinon, après un 2e enregistrement, les cases réaffichaient l'ancien état)
     delete state.presenceRecordsToday[classId];
     await loadAndRenderPresenceChecklist(classId, dateStr);
-    loadPresenceHistory(classId, true); // rafraîchir l'historique avec la séance enregistrée
+    // rafraîchir l'historique avec la séance enregistrée, puis recopier le פרק.שיעור
+    // de la séance la plus récente dans "Chapitre en cours" de la classe
+    loadPresenceHistory(classId, true).then(() => syncChapitreEnCours(cls, dateStr, chapitreVal));
     if (dateStr === getTodayStr()) {
       state.presenceRecordsToday[classId] = state.presenceCache[classId].existingMap;
       state.presenceMeta[classId] = { chapitre: chapitreVal != null ? chapitreVal : '', lecon: leconVal };
