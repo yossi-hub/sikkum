@@ -275,6 +275,18 @@ table.contact-table { width: 100%; border-collapse: collapse; font-size: 12.5px;
   .tabs-bar { padding: 0 0.75rem; }
   .tab-btn { padding: 10px 12px; font-size: 13px; }
 }
+/* Fiche contact élève (clic sur le nom) */
+.student-link { cursor: pointer; text-decoration: underline dotted rgba(2,93,184,0.45); text-underline-offset: 3px; }
+.student-link:hover { color: #025db8; }
+.contact-overlay { position: fixed; inset: 0; background: rgba(46,46,46,0.45); display: flex; align-items: center; justify-content: center; padding: 16px; z-index: 1000; }
+.contact-modal { background: #FFF9F2; border-radius: 14px; width: 100%; max-width: 360px; padding: 1.25rem 1.25rem 1rem; box-shadow: 0 12px 40px rgba(0,0,0,0.2); direction: rtl; }
+.contact-modal-name { font-family: 'League Spartan', sans-serif; font-size: 19px; font-weight: 700; color: #025db8; margin-bottom: 1rem; }
+.contact-modal-line { display: flex; align-items: center; gap: 10px; padding: 10px 12px; background: #fff; border: 0.5px solid rgba(2,93,184,0.15); border-radius: 10px; margin-bottom: 8px; font-size: 14px; }
+.contact-modal-line a { color: #2e2e2e; text-decoration: none; direction: ltr; unicode-bidi: isolate; word-break: break-all; flex: 1; text-align: right; }
+.contact-modal-line a:hover { color: #025db8; text-decoration: underline; }
+.contact-modal-line .muted { color: #aaa; flex: 1; }
+.contact-modal-copy { border: none; background: rgba(2,93,184,0.08); color: #025db8; border-radius: 6px; padding: 4px 8px; font-size: 12px; cursor: pointer; flex-shrink: 0; }
+.contact-modal-close { margin-top: 6px; width: 100%; padding: 10px; border-radius: 10px; border: none; background: #025db8; color: #fff; font-family: 'League Spartan', sans-serif; font-size: 15px; font-weight: 700; cursor: pointer; }
 </style>
 </head>
 <body>
@@ -1348,7 +1360,7 @@ function buildSikkumHtml() {
       const pres = state.presences[`${name}__${cls.num}`];
       const presHtml = pres !== undefined ? `<span class="badge-pres">${pres}</span>` : `<span class="badge-pres badge-unknown">—</span>`;
       html += `<tr>
-        <td class="student-name">${name}</td>
+        <td class="student-name">${studentNameHtml(sid, name)}</td>
         <td style="text-align:center;">${presHtml}</td>
         <td><textarea class="eval" id="eval-${cls.id}-${sid}" placeholder="הערות..." ${isSent?'disabled':''}></textarea></td>
         <td><select class="passage" id="passage-${cls.id}-${sid}" ${isSent?'disabled':''}>
@@ -1572,10 +1584,85 @@ function toggleDoneClassesSection() {
   if (chevron) chevron.style.transform = isOpen ? 'rotate(0deg)' : 'rotate(180deg)';
 }
 
+// ── Fiche contact élève : clic sur un nom → mail + téléphone ──
+const FLD_ST_MAIL = 'fldEHNkF6TABll0E1'; // Students > Mail
+const FLD_ST_TEL  = 'fldALFs7palI2SgO2'; // Students > Tel
+const FLD_ST_NAME_ID = 'fld52H73jX8ISBZ4h'; // Students > Name
+const studentContactCache = {};
+
+// Nom d'élève cliquable (le clic n'active pas la case à cocher autour)
+function studentNameHtml(sid, name) {
+  return `<span class="student-link" onclick="event.preventDefault();event.stopPropagation();showStudentContact('${sid}')">${escHtml(name)}</span>`;
+}
+
+function closeStudentContact() {
+  document.getElementById('contact-overlay')?.remove();
+  document.removeEventListener('keydown', onContactKey);
+}
+function onContactKey(e) { if (e.key === 'Escape') closeStudentContact(); }
+
+function copyContactValue(btn, value) {
+  const done = () => { btn.textContent = '✓'; setTimeout(() => { btn.textContent = 'העתקה'; }, 1200); };
+  try { navigator.clipboard.writeText(value).then(done, () => {}); } catch (e) { /* copie indisponible */ }
+}
+
+// Airtable stocke souvent les numéros sans "+" (ex. "33687692156") : on rajoute l'indicatif international
+function normalizeTel(raw) {
+  const s = String(raw || '').trim();
+  let d = s.replace(/[^\d+]/g, '');
+  if (!d) return { href: '', label: '' };
+  if (d.startsWith('00')) d = '+' + d.slice(2);
+  else if (!d.startsWith('+') && !d.startsWith('0') && d.length >= 10) d = '+' + d;
+  let label = d;
+  if (/^\+33\d{9}$/.test(d)) label = '+33 ' + d.slice(3, 4) + ' ' + d.slice(4).replace(/(\d{2})(?=\d)/g, '$1 ');
+  else if (/^\+972\d{8,9}$/.test(d)) label = '+972 ' + d.slice(4, d.length - 7) + '-' + d.slice(-7, -4) + '-' + d.slice(-4);
+  return { href: `tel:${d}`, label };
+}
+
+function renderStudentContact(sid, c) {
+  const box = document.getElementById('contact-modal-body');
+  if (!box) return;
+  const name = state.students[sid] || c.name || '';
+  const line = (icon, value, href) => value
+    ? `<div class="contact-modal-line"><span>${icon}</span><a href="${escHtml(href)}">${escHtml(value)}</a><button type="button" class="contact-modal-copy" onclick="copyContactValue(this, ${escHtml(JSON.stringify(value))})">העתקה</button></div>`
+    : `<div class="contact-modal-line"><span>${icon}</span><span class="muted">לא צוין</span></div>`;
+  box.innerHTML = `
+    <div class="contact-modal-name">${escHtml(name)}</div>
+    ${line('✉️', c.mail, `mailto:${c.mail}`)}
+    ${(t => line('📞', t.label, t.href))(normalizeTel(c.tel))}`;
+}
+
+async function showStudentContact(sid) {
+  closeStudentContact();
+  const overlay = document.createElement('div');
+  overlay.className = 'contact-overlay';
+  overlay.id = 'contact-overlay';
+  overlay.onclick = e => { if (e.target === overlay) closeStudentContact(); };
+  overlay.innerHTML = `
+    <div class="contact-modal" role="dialog" aria-modal="true">
+      <div id="contact-modal-body"><div class="loading" style="padding:1rem;"><div class="spinner"></div></div></div>
+      <button type="button" class="contact-modal-close" onclick="closeStudentContact()">סגירה</button>
+    </div>`;
+  document.body.appendChild(overlay);
+  document.addEventListener('keydown', onContactKey);
+
+  if (studentContactCache[sid]) { renderStudentContact(sid, studentContactCache[sid]); return; }
+  try {
+    const rec = await api(BASE_COURS, TABLE_STUDENTS, `/${sid}?returnFieldsByFieldId=true`);
+    const f = rec.fields || {};
+    const c = { mail: (f[FLD_ST_MAIL] || '').trim(), tel: (f[FLD_ST_TEL] || '').trim(), name: f[FLD_ST_NAME_ID] || '' };
+    studentContactCache[sid] = c;
+    renderStudentContact(sid, c);
+  } catch (e) {
+    const box = document.getElementById('contact-modal-body');
+    if (box) box.innerHTML = `<div class="error-msg">לא ניתן לטעון את פרטי התלמיד/ה</div>`;
+  }
+}
+
 // Détail d'une séance : présents / absents (avec motif)
 function histDetailHtml(classId, s, readOnly) {
   const byName = (a, b) => (state.students[a.sid] || '').localeCompare(state.students[b.sid] || '', 'he');
-  const nameOf = x => escHtml(state.students[x.sid] || '?');
+  const nameOf = x => studentNameHtml(x.sid, state.students[x.sid] || '?');
   const presents = s.students.filter(x => x.present).sort(byName);
   const absents  = s.students.filter(x => !x.present).sort(byName);
   let html = `<div class="pres-hist-detail">`;
@@ -1651,7 +1738,7 @@ function buildStudentChecklist(cls, existingMap) {
     const motif = rec ? (rec.motif || '') : '';
     html += `
       <div class="pres-row-wrap">
-        <label class="pres-row"><input type="checkbox" class="pres-check" id="pc-${cls.id}-${sid}" onchange="toggleMotifField('${cls.id}','${sid}')" ${checked ? 'checked' : ''} /> <span>${name}</span></label>
+        <label class="pres-row"><input type="checkbox" class="pres-check" id="pc-${cls.id}-${sid}" onchange="toggleMotifField('${cls.id}','${sid}')" ${checked ? 'checked' : ''} /> ${studentNameHtml(sid, name)}</label>
         <input type="text" class="field-input pres-motif" id="pm-${cls.id}-${sid}" placeholder="סיבת היעדרות" value="${motif}" style="display:${checked ? 'none' : 'inline-block'};" />
       </div>`;
   }
@@ -2035,7 +2122,7 @@ async function confirmRemplacement() {
       const name = state.students[sid] || sid;
       const rec = existingMap[sid];
       const checked = rec ? rec.present : false;
-      return `<label class="pres-row"><input type="checkbox" class="pres-check" id="rc-${sid}" ${checked ? 'checked' : ''} /> <span>${name}</span></label>`;
+      return `<label class="pres-row"><input type="checkbox" class="pres-check" id="rc-${sid}" ${checked ? 'checked' : ''} /> ${studentNameHtml(sid, name)}</label>`;
     }).join('');
     document.getElementById('remp-results').innerHTML = `
       <div class="card" style="border-color:#f55700;">
