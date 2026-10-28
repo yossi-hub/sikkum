@@ -2024,6 +2024,12 @@ async function confirmRemplacement() {
       const sid = (rec.fields[FLD_PRES_ELEVE] || [])[0];
       if (sid) existingMap[sid] = { recordId: rec.id, present: !!rec.fields[FLD_PRES_PRESENT] };
     }
+    // Pré-remplir פרק.שיעור et מס' שיעור si la séance a déjà été enregistrée
+    const metaRec = recs.find(rec => rec.fields[FLD_PRES_CHAPITRE] != null && rec.fields[FLD_PRES_CHAPITRE] !== '') || recs[0];
+    const meta = {
+      chapitre: metaRec && metaRec.fields[FLD_PRES_CHAPITRE] != null ? String(metaRec.fields[FLD_PRES_CHAPITRE]) : '',
+      lecon: (metaRec && metaRec.fields[FLD_PRES_LECON]) || ''
+    };
     const sortedIds = [...r.studentIds].sort((a, b) => (state.students[a] || '').localeCompare(state.students[b] || '', 'he'));
     const listHtml = sortedIds.map(sid => {
       const name = state.students[sid] || sid;
@@ -2034,6 +2040,19 @@ async function confirmRemplacement() {
     document.getElementById('remp-results').innerHTML = `
       <div class="card" style="border-color:#f55700;">
         <div style="font-weight:600;margin-bottom:8px;">כיתה ${r.num} — החלפה (${r.teacher || '—'}) — ${dateStr}</div>
+        <div class="infos-grid" style="margin-bottom:12px;">
+          <div class="field-group" style="max-width:160px;">
+            <label class="field-label">פרק.שיעור *</label>
+            <input type="text" inputmode="decimal" autocomplete="off" class="field-input pres-cours-input" id="remp-chapitre" value="${escHtml(meta.chapitre)}" placeholder="1.3" oninput="this.classList.remove('missing'); const e = document.getElementById('remp-submit-error'); if (e) e.innerHTML = '';" />
+          </div>
+          <div class="field-group infos-full">
+            <div class="pres-cours-help">✏️ יש לרשום את מספר הפרק ואת מספר השיעור, מופרדים בנקודה. לדוגמה: <b>1.3</b> = פרק 1, שיעור 3 · <b>8.7</b> = פרק 8, שיעור 7</div>
+          </div>
+          <div class="field-group infos-full">
+            <label class="field-label">מס' שיעור ושקופית במצגת</label>
+            <input type="text" class="field-input" id="remp-lecon" value="${escHtml(meta.lecon)}" placeholder="לדוגמה: שיעור 5, שקופית 12" />
+          </div>
+        </div>
         <div class="pres-students">${listHtml}</div>
         <div id="remp-submit-error"></div>
         <div style="margin-top:12px;display:flex;gap:10px;">
@@ -2048,10 +2067,51 @@ async function confirmRemplacement() {
   }
 }
 
+// Après un remplacement : recopie dans "Chapitre en cours" le פרק.שיעור de la séance
+// LA PLUS RÉCENTE de la classe (même règle que syncChapitreEnCours : pas de recul).
+async function syncChapitreEnCoursRemplacement(classId, classNum) {
+  try {
+    const formula = encodeURIComponent(`{Classes}="${String(classNum).replace(/"/g,'\\"')}"`);
+    const fields = [FLD_PRES_DATE, FLD_PRES_CHAPITRE].map(f => `&fields%5B%5D=${f}`).join('');
+    const recs = await getAll(BASE_COURS, TABLE_PRESENCES_JOUR, `?filterByFormula=${formula}&returnFieldsByFieldId=true${fields}`);
+    let bestDate = '', code = '';
+    for (const rec of recs) {
+      const d = String(rec.fields[FLD_PRES_DATE] || '').slice(0, 10);
+      const c = normalizeCours(rec.fields[FLD_PRES_CHAPITRE]);
+      if (d && c && d > bestDate) { bestDate = d; code = c; } // tri côté client
+    }
+    if (!code) return;
+    await api(BASE_COURS, TABLE_CLASSES, `/${classId}`, 'PATCH', { fields: { [FLD_CL_CHAPITRE]: code } });
+    // si c'est aussi une classe affichée dans l'app, garder l'affichage à jour
+    const own = (state.classes || []).find(c => c.id === classId);
+    if (own) { own.chapitre = code; delete state.presenceHistory[classId]; }
+    const mc = (state.mesclasses || []).find(c => c.id === classId);
+    if (mc) mc.chapitre = code;
+  } catch (e) {
+    console.warn('Mise à jour "Chapitre en cours" (remplacement) impossible :', e.message);
+  }
+}
+
 async function submitRemplacementPresence(dateStr) {
   const r = remplacementSelected;
   if (!r) return;
   const btn = document.getElementById('remp-submit-btn');
+  const errBox = document.getElementById('remp-submit-error');
+  if (errBox) errBox.innerHTML = '';
+
+  // "chapitre.cours" obligatoire, comme pour ses propres classes
+  const chapitreEl = document.getElementById('remp-chapitre');
+  const chapitreRaw = chapitreEl?.value || '';
+  const chapitreVal = normalizeCours(chapitreRaw);
+  if (!chapitreVal) {
+    chapitreEl?.classList.add('missing');
+    if (errBox) errBox.innerHTML = `<div class="error-msg">${coursErrorMsg(chapitreRaw)}</div>`;
+    chapitreEl?.focus();
+    return;
+  }
+  if (chapitreEl) chapitreEl.value = chapitreVal;
+  const leconVal = document.getElementById('remp-lecon')?.value || '';
+
   if (btn) { btn.disabled = true; btn.textContent = 'שומר...'; }
   const isoDate = `${dateStr}T12:00:00.000Z`;
   const toCreate = [], toUpdate = [];
@@ -2063,7 +2123,9 @@ async function submitRemplacementPresence(dateStr) {
       [FLD_PRES_CLASSE]: r.num,
       [FLD_PRES_DATE]: isoDate,
       [FLD_PRES_PRESENT]: el.checked,
-      [FLD_PRES_PROF]: state.teacher.name
+      [FLD_PRES_PROF]: state.teacher.name,
+      [FLD_PRES_CHAPITRE]: chapitreVal,
+      [FLD_PRES_LECON]: leconVal
     };
     const existing = r._existingMap[sid];
     if (existing) toUpdate.push({ id: existing.recordId, fields });
@@ -2076,6 +2138,7 @@ async function submitRemplacementPresence(dateStr) {
     for (let i = 0; i < toCreate.length; i += 10) {
       await api(BASE_COURS, TABLE_PRESENCES_JOUR, '', 'POST', { records: toCreate.slice(i, i + 10) });
     }
+    syncChapitreEnCoursRemplacement(r.id, r.num); // en arrière-plan, ne bloque pas
     document.getElementById('remp-results').innerHTML = `
       <div class="success-screen" style="padding:1.5rem;">
         <div class="success-icon">✅</div>
