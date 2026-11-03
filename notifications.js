@@ -401,7 +401,7 @@
     else if (applying.has(offer.id)) { label = 'שומר…'; disabled = true; }
     else if (model.error) { label = 'יש לרענן לפני שליחת מועמדות'; disabled = true; }
     else if ((offer.teacherIds || []).includes(state.teacher.id)) { label = 'היעדרות שלך'; disabled = true; }
-    return '<button type="button" class="btn-blue notification-apply" data-apply-offer="' + html(offer.id) +
+    return '<button type="button" class="notification-apply" data-apply-offer="' + html(offer.id) +
       '" onclick="LaviNotifications.apply(this.dataset.applyOffer)"' + (disabled ? ' disabled' : '') +
       '>' + label + '</button>';
   }
