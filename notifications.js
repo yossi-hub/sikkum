@@ -253,12 +253,12 @@
         return 'RECORD_ID()=' + formulaString(id);
       }).join(',') + ')';
       const records = await getAll(BASE_COURS, TABLE_CLASSES, query([
-        FLD_CL_NUM, FLD_CL_NIVEAU, FLD_CL_JOUR_TEXT, FLD_CL_HORAIRES, FLD_CL_ENDROIT
+        FLD_CL_NUM, FLD_CL_CHAPITRE, FLD_CL_JOUR_TEXT, FLD_CL_HORAIRES, FLD_CL_ENDROIT
       ], formula));
       for (const r of records) {
         const f = r.fields;
         info.set(r.id, {
-          classId: r.id, num: textValue(f[FLD_CL_NUM]), niveau: textValue(f[FLD_CL_NIVEAU]),
+          classId: r.id, num: textValue(f[FLD_CL_NUM]), chapitre: textValue(f[FLD_CL_CHAPITRE]),
           jour: textValue(f[FLD_CL_JOUR_TEXT]), horaires: textValue(f[FLD_CL_HORAIRES]),
           endroit: (f[FLD_CL_ENDROIT] || []).map(function (id) { return lieux[id] || ''; }).filter(Boolean).join(', ')
         });
@@ -337,6 +337,7 @@
       if (item.type === 'remplacement') {
         const offer = offers.get(item.source);
         if (offer) item.data = offer;
+        item.detail = offerDetail(item.data);
         item.status = offer && offer.assigned ? 'השיעור כבר אויש' :
           !openIds.has(item.source) ? 'ההצעה אינה זמינה עוד' : '';
         closed = !openIds.has(item.source);
@@ -390,7 +391,8 @@
     renderProposals();
   }
   function offerDetail(offer) {
-    return [formatFrDate(offer.date), offer.jour, offer.horaires, offer.endroit, offer.niveau].filter(Boolean).join(' · ');
+    return [formatFrDate(offer.date), offer.jour, offer.horaires, offer.endroit,
+      offer.chapitre ? 'פרק נוכחי: ' + offer.chapitre : ''].filter(Boolean).join(' · ');
   }
   function offerButton(offer) {
     let label = 'אני פנוי/ה להחלפה', disabled = false;

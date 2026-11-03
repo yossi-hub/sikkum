@@ -10,7 +10,7 @@ const F = {
   students: 'tblnFCt3Ne5oHwhlr', presence: 'tblDbn6AT04csXvWd',
   absClass: 'fld4ydS6ZndZyDcAk', absDate: 'fld1RZ9dTN84WyRhT',
   absTeacher: 'fldCVfLoV3TXvTycH', replacement: 'fldpe4Y3zKJQCrMrK',
-  num: 'fldcKQPOroEmSYmwE', level: 'fld2E7XYUsEBuPBPx', hours: 'fldOT7CUfWymgpt6x',
+  num: 'fldcKQPOroEmSYmwE', level: 'fld2E7XYUsEBuPBPx', chapter: 'fldedo3AHC5u6o7pZ', hours: 'fldOT7CUfWymgpt6x',
   day: 'fldBQEy5J44zTUtbJ', site: 'fldaewXOB571FRk08',
   hKey: 'fldfMRaqWZFEMv36M', hClass: 'fldd6JfbXm1gYJF4f',
   hDate: 'fld1AFy3hw88o9wqN', hName: 'fldXcijGPH04eNHrD',
@@ -30,7 +30,7 @@ function makeBackend() {
   const carol = { id: id('E'), fields: { Name: 'Carol', Email: 'carol@example.test' } };
   const classId = id('B'), offerId = id('C'), pastAbsenceId = id('F');
   const classFields = {
-    [F.num]: '101', [F.level]: 'רמה ב', [F.hours]: '18:00–20:00',
+    [F.num]: '101', [F.level]: 'רמה ב', [F.chapter]: '4.2', [F.hours]: '18:00–20:00',
     [F.day]: 'יום שלישי', [F.site]: ['siteDemo'],
     'Numéro de Classe': '101', 'Teacher en texte': 'Beth', Status: 'In Progress',
     Students: [id('S')]
