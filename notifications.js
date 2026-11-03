@@ -148,7 +148,7 @@
   }
   function headerHtml() {
     return '<button type="button" class="notifications-bell" id="notifications-bell" ' +
-      'aria-label="התראות" aria-haspopup="dialog" aria-expanded="false" onclick="LaviNotifications.toggle()">' +
+      'aria-label="עדכונים" aria-haspopup="dialog" aria-expanded="false" onclick="LaviNotifications.toggle()">' +
       '<svg viewBox="0 0 24 24" width="23" height="23" fill="none" stroke="currentColor" stroke-width="1.8" ' +
       'stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' +
       '<path d="M18 8a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9"/>' +
@@ -159,7 +159,7 @@
     const dot = document.getElementById('notifications-dot');
     const hasUnread = model.items.some(unread);
     if (dot) dot.hidden = !hasUnread;
-    if (button) button.setAttribute('aria-label', hasUnread ? 'התראות — יש התראות שלא נקראו' : 'התראות');
+    if (button) button.setAttribute('aria-label', hasUnread ? 'עדכונים — יש עדכונים שלא נקראו' : 'עדכונים');
   }
   function start() {
     if (!listening) {
@@ -214,7 +214,7 @@
     const capture = captureSession();
     const task = load(capture).catch(function (error) {
       if (current(capture)) {
-        model.error = 'לא ניתן לעדכן את ההתראות כרגע. אפשר לנסות שוב.';
+        model.error = 'לא ניתן לטעון את העדכונים כרגע. אפשר לנסות שוב.';
         renderDialog();
         renderProposals();
       }
@@ -435,7 +435,7 @@
     dialog.className = 'notifications-dialog';
     dialog.setAttribute('aria-labelledby', 'notifications-title');
     dialog.setAttribute('dir', 'rtl');
-    dialog.innerHTML = '<div class="notifications-heading"><h2 id="notifications-title">התראות</h2>' +
+    dialog.innerHTML = '<div class="notifications-heading"><h2 id="notifications-title">עדכונים</h2>' +
       '<button type="button" class="notification-close" aria-label="סגירה" onclick="LaviNotifications.close()">×</button></div>' +
       '<div id="notifications-content"></div><div id="notifications-message" class="notification-error" role="status"></div>';
     dialog.addEventListener('click', function (e) {
@@ -471,7 +471,7 @@
     if (selectedKey) {
       const item = model.items.find(function (n) { return n.key === selectedKey; });
       if (item) {
-        container.innerHTML = '<button type="button" class="btn-ghost notification-back" onclick="LaviNotifications.back()">← לכל ההתראות</button>' +
+        container.innerHTML = '<button type="button" class="btn-ghost notification-back" onclick="LaviNotifications.back()">← לכל העדכונים</button>' +
           '<div class="notification-detail"><h3>' + html(item.title) + '</h3><p>' + html(item.detail) + '</p>' +
           (item.status ? '<span class="notification-status">' + html(item.status) + '</span>' : '') +
           (item.type === 'remplacement' && item.data.id ? offerButton(item.data) : '') + '</div>';
@@ -479,7 +479,7 @@
         return;
       }
     }
-    container.innerHTML = !model.loaded && !model.error ? '<div class="loading">טוען התראות…</div>' :
+    container.innerHTML = !model.loaded && !model.error ? '<div class="loading">טוען עדכונים…</div>' :
       model.items.length ? '<div class="notifications-list">' + model.items.map(function (item) {
         return '<button type="button" class="notification-item' + (unread(item) ? ' is-unread' : '') +
           '" data-notification-key="' + html(item.key) + '"><span class="notification-item-title">' +
@@ -487,7 +487,7 @@
           html(item.title) + '</span><span class="notification-item-detail">' + html(item.detail) +
           '</span>' + (item.status ? '<span class="notification-status">' + html(item.status) + '</span>' : '') +
           '</button>';
-      }).join('') + '</div>' : '<div class="notification-empty">אין התראות כרגע</div>';
+      }).join('') + '</div>' : '<div class="notification-empty">אין עדכונים כרגע</div>';
     showMessage(model.error || actionMessage);
   }
   function back() { selectedKey = null; renderDialog(); }
@@ -517,7 +517,7 @@
     } catch (_) {
       if (current(capture)) {
         renderDialog();
-        showMessage('לא ניתן לפתוח את ההתראה כרגע. אפשר לנסות שוב.');
+        showMessage('לא ניתן לפתוח את העדכון כרגע. אפשר לנסות שוב.');
       }
     }
   }

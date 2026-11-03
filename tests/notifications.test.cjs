@@ -158,7 +158,7 @@ test('l’échec Airtable reste visible et ne crée aucun faux succès', async (
   b.failReads = true;
   await app.feature.refresh();
   assert.equal(b.writes.length, 0);
-  assert.match(app.document.getElementById('remplacement-proposals').innerHTML, /לא ניתן לעדכן/);
+  assert.match(app.document.getElementById('remplacement-proposals').innerHTML, /לא ניתן לטעון את העדכונים/);
 });
 
 test('les titres et détails provenant d’Airtable sont échappés', async () => {
