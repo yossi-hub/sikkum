@@ -425,7 +425,7 @@
             html(offer.num) + '</span><span class="remplacement-prop-date">' + html(formatFrDate(offer.date)) +
             '</span></div><div class="remplacement-prop-body">' + html(offerDetail(offer)) +
             '</div>' + offerButton(offer) + '</div>';
-        }).join('') + '</div><div class="remplacement-props-note">מיכל תבחר למי לשייך את ההחלפה לאחר קבלת המועמדויות.</div></div>' : '');
+        }).join('') + '</div></div>' : '');
   }
   function ensureDialog() {
     let dialog = document.getElementById('notifications-dialog');
@@ -601,7 +601,7 @@
       }
       if (!current(capture)) return;
       model.applications.add(id);
-      actionMessage = 'המועמדות נשלחה. מיכל תבחר למי לשייך את ההחלפה.';
+      actionMessage = 'המועמדות נשלחה.';
     } catch (_) {
       if (current(capture)) actionMessage = 'לא ניתן לאשר שהמועמדות נשמרה. יש לרענן ולבדוק לפני ניסיון נוסף.';
     } finally {
