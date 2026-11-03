@@ -25,6 +25,40 @@ body { font-family: 'Poppins', -apple-system, sans-serif; background: #f0ede8; c
 .header-title { color: #fff; font-family: 'League Spartan', sans-serif; font-size: 15px; font-weight: 600; }
 .header-sub { color: rgba(255,255,255,0.65); font-size: 12px; margin-top: 2px; }
 
+/* Notifications : cloche, point rouge et liste personnelle. */
+.notifications-bell { position:relative; width:44px; height:44px; flex-shrink:0; display:inline-flex; align-items:center; justify-content:center; color:#fff; background:rgba(255,255,255,.12); border:1px solid rgba(255,255,255,.25); border-radius:50%; cursor:pointer; }
+.notifications-bell:hover { background:rgba(255,255,255,.22); }
+.notifications-bell:focus-visible { outline:3px solid #fff; outline-offset:3px; }
+.notifications-dot { position:absolute; top:6px; right:7px; width:10px; height:10px; border-radius:50%; background:#ff493e; border:2px solid #025db8; }
+.notifications-dialog { width:min(520px,calc(100vw - 24px)); max-height:85vh; margin:7vh auto; padding:0; border:1px solid rgba(2,93,184,.18); border-radius:16px; background:#FFF9F2; color:#2e2e2e; box-shadow:0 20px 70px rgba(0,0,0,.2); font-family:inherit; }
+.notifications-dialog::backdrop { background:rgba(15,30,48,.4); }
+.notifications-heading { display:flex; justify-content:space-between; align-items:center; padding:16px 20px; background:#025db8; color:#fff; }
+.notifications-heading h2 { font-size:20px; }
+.notification-close { width:40px; height:40px; border:0; border-radius:50%; background:rgba(255,255,255,.14); color:#fff; font-size:28px; cursor:pointer; }
+#notifications-content { max-height:65vh; overflow:auto; padding:14px; }
+.notifications-list { display:flex; flex-direction:column; gap:9px; }
+.notification-item { width:100%; text-align:right; display:flex; flex-direction:column; gap:7px; border:1px solid #e2e4e8; background:#fff; border-radius:10px; padding:15px; font:inherit; color:inherit; cursor:pointer; }
+.notification-item.is-unread { background:#eef5ff; border-color:#a9c9ef; }
+.notification-item:hover { border-color:#025db8; }
+.notification-item-title { font-size:14px; font-weight:700; }
+.notification-item-detail { font-size:12px; color:#606974; line-height:1.7; }
+.notification-unread { display:inline-block; width:7px; height:7px; margin-left:7px; border-radius:50%; background:#ed4540; }
+.notification-status { display:block; margin-top:5px; font-size:12px; font-weight:600; color:#5f6974; }
+.notification-empty { padding:36px 15px; text-align:center; color:#697586; font-size:14px; }
+.notification-detail { padding:14px 4px; }
+.notification-detail h3 { font-size:17px; color:#025db8; margin-bottom:12px; }
+.notification-detail p { font-size:14px; line-height:1.9; }
+.notification-apply { margin-top:14px; min-height:44px; font-family:inherit; }
+.notification-apply:disabled { opacity:.65; cursor:default; }
+.notification-error { padding:10px 16px; font-size:13px; line-height:1.7; color:#a23b22; }
+.notification-error:empty { display:none; }
+.notification-back { min-height:44px; }
+@media(max-width:600px) {
+  #header-right > div { flex-wrap:wrap; justify-content:flex-end; gap:6px !important; }
+  .app-header { gap:10px; }
+  .notifications-dialog { margin:4vh auto; max-height:90vh; }
+}
+
 /* ── ONGLETS ── */
 .tabs-bar { background: #025db8; padding: 0 1.5rem; display: flex; gap: 4px; border-top: 1px solid rgba(255,255,255,0.15); }
 .tab-btn { padding: 10px 18px; font-family: 'League Spartan', sans-serif; font-size: 14px; font-weight: 600; color: rgba(255,255,255,0.65); background: transparent; border: none; border-bottom: 3px solid transparent; cursor: pointer; transition: color .15s, border-color .15s; white-space: nowrap; }
@@ -317,6 +351,7 @@ table.contact-table { width: 100%; border-collapse: collapse; font-size: 12.5px;
   </div>
 </div>
 
+<script src="notifications.js"></script>
 <script>
 const BASE_COURS        = 'appNbwmEyVQsXA25U';
 const BASE_PRESENCE     = 'appkhAfrnk3fafBwM';
@@ -606,9 +641,11 @@ function renderHeaderUser(teacher) {
   document.getElementById('header-right').innerHTML = `
     <div style="display:flex;align-items:center;gap:10px;direction:ltr;">
       ${adminControls}
+      ${LaviNotifications.headerHtml()}
       <span style="color:rgba(255,255,255,0.9);font-size:13px;font-weight:500;">${teacher.name}</span>
       <button class="btn-logout" onclick="logout()">התנתקות</button>
     </div>`;
+  LaviNotifications.start();
 }
 
 function renderHeaderDefault() {
@@ -619,6 +656,7 @@ function renderHeaderDefault() {
 // ── INIT ──
 function resetTeacherState() {
   sessionId++;          // invalide tout chargement encore en cours
+  LaviNotifications.reset();
   classesLoading = false;
   classesPromise = null;
   classesLoaded = false;
@@ -1993,6 +2031,7 @@ async function submitPresence(classId) {
     // rafraîchir l'historique avec la séance enregistrée, puis recopier le פרק.שיעור
     // de la séance la plus récente dans "Chapitre en cours" de la classe
     loadPresenceHistory(classId, true).then(() => syncChapitreEnCours(cls, dateStr, chapitreVal));
+    LaviNotifications.presenceSaved(cls.num, dateStr);
     if (dateStr === getTodayStr()) {
       state.presenceRecordsToday[classId] = state.presenceCache[classId].existingMap;
       state.presenceMeta[classId] = { chapitre: chapitreVal != null ? chapitreVal : '', lecon: leconVal };
@@ -2049,24 +2088,30 @@ async function onRemplacementSearch() {
     </div>`).join('');
 }
 
-async function selectRemplacementClass(classId) {
+async function selectRemplacementClass(classId, dateStr) {
+  const mySession = sessionId;
   const light = allClassesLight?.find(c => c.id === classId);
   if (!light) return;
   const resultsEl = document.getElementById('remp-results');
   resultsEl.innerHTML = `<div class="loading" style="padding:0.5rem;"><div class="spinner"></div></div>`;
   try {
     const clsRec = await api(BASE_COURS, TABLE_CLASSES, `/${classId}`);
+    if (mySession !== sessionId) return;
     const studentIds = clsRec.fields['Students'] || [];
     const missingIds = studentIds.filter(id => !state.students[id]);
     for (let i = 0; i < missingIds.length; i += 10) {
       const batch = missingIds.slice(i, i + 10);
       const formula = encodeURIComponent(`OR(${batch.map(id => `RECORD_ID()="${id}"`).join(',')})`);
       const res = await api(BASE_COURS, TABLE_STUDENTS, `?filterByFormula=${formula}`);
+      if (mySession !== sessionId) return;
       for (const r of (res.records || [])) state.students[r.id] = (r.fields['Name'] || r.id).trim();
     }
     remplacementSelected = { id: classId, num: light.num, teacher: light.teacher, studentIds };
+    if (mySession !== sessionId) return;
     renderRemplacementConfirm();
+    if (dateStr) await confirmRemplacement(dateStr);
   } catch (e) {
+    if (mySession !== sessionId) return;
     resultsEl.innerHTML = `<div class="error-msg">Erreur : ${e.message}</div>`;
   }
 }
@@ -2095,8 +2140,8 @@ function cancelRemplacement() {
   if (searchEl) searchEl.value = '';
 }
 
-async function confirmRemplacement() {
-  const dateStr = document.getElementById('remp-date')?.value || getTodayStr();
+async function confirmRemplacement(selectedDate) {
+  const dateStr = selectedDate || document.getElementById('remp-date')?.value || getTodayStr();
   const r = remplacementSelected;
   if (!r) return;
   document.getElementById('remp-results').innerHTML = `<div class="loading" style="padding:0.5rem;"><div class="spinner"></div></div>`;
@@ -2222,6 +2267,7 @@ async function submitRemplacementPresence(dateStr) {
     for (let i = 0; i < toCreate.length; i += 10) {
       await api(BASE_COURS, TABLE_PRESENCES_JOUR, '', 'POST', { records: toCreate.slice(i, i + 10) });
     }
+    LaviNotifications.presenceSaved(r.num, dateStr);
     syncChapitreEnCoursRemplacement(r.id, r.num); // en arrière-plan, ne bloque pas
     document.getElementById('remp-results').innerHTML = `
       <div class="success-screen" style="padding:1.5rem;">
@@ -2513,78 +2559,8 @@ function renderPointsTab() {
 
 // ── PROPOSITIONS DE REMPLACEMENT (écran d'accueil) ──
 async function loadRemplacementProposals() {
-  const container = document.getElementById('remplacement-proposals');
-  if (!container) return;
-  try {
-    const recs = await getAll(BASE_COURS, TABLE_ABSENCES, `?view=${VIEW_REMPLACEMENT}&returnFieldsByFieldId=true`);
-    if (!recs.length) { container.innerHTML = ''; return; }
-
-    const classIds = [...new Set(recs.flatMap(r => r.fields[FLD_ABS_CLASSE] || []))];
-    if (!classIds.length) { container.innerHTML = ''; return; }
-    const lieux = await loadLieuxMap();
-    const classInfo = {};
-    for (let i = 0; i < classIds.length; i += 10) {
-      const batch = classIds.slice(i, i + 10);
-      const formula = encodeURIComponent(`OR(${batch.map(id => `RECORD_ID()="${id}"`).join(',')})`);
-      const res = await api(BASE_COURS, TABLE_CLASSES, `?filterByFormula=${formula}&returnFieldsByFieldId=true`);
-      for (const c of (res.records || [])) {
-        const f = c.fields;
-        const endroitIds = f[FLD_CL_ENDROIT] || [];
-        classInfo[c.id] = {
-          num: f[FLD_CL_NUM] || '',
-          niveau: f[FLD_CL_NIVEAU] || '',
-          jour: f[FLD_CL_JOUR_TEXT] || '',
-          horaires: f[FLD_CL_HORAIRES] || '',
-          endroit: endroitIds.map(id => lieux[id] || '').filter(Boolean).join(', ')
-        };
-      }
-    }
-
-    const todayStr = getTodayStr();
-    const props = recs
-      .map(r => {
-        const cid = (r.fields[FLD_ABS_CLASSE] || [])[0];
-        const info = classInfo[cid] || {};
-        return {
-          date: r.fields[FLD_ABS_DATE] || '',
-          num: info.num || '',
-          niveau: info.niveau || '',
-          jour: info.jour || '',
-          horaires: info.horaires || '',
-          endroit: info.endroit || ''
-        };
-      })
-      .filter(p => p.num && p.date >= todayStr)
-      .sort((a, b) => a.date.localeCompare(b.date));
-
-    if (!props.length) { container.innerHTML = ''; return; }
-
-    let html = `
-      <div class="remplacement-props">
-        <div class="remplacement-props-title">🔄 הצעות להחלפת שיעורים</div>
-        <div class="remplacement-props-list">`;
-    for (const p of props) {
-      html += `
-          <div class="remplacement-prop-card">
-            <div class="remplacement-prop-head">
-              <span>כיתה ${p.num}</span>
-              ${p.date ? `<span class="remplacement-prop-date">${formatFrDate(p.date)}</span>` : ''}
-            </div>
-            <div class="remplacement-prop-body">
-              ${p.niveau ? `<div>${p.niveau}</div>` : ''}
-              ${(p.jour || p.horaires) ? `<div>${[p.jour, p.horaires].filter(Boolean).join(' • ')}</div>` : ''}
-              ${p.endroit ? `<div>${p.endroit}</div>` : ''}
-            </div>
-          </div>`;
-    }
-    html += `
-        </div>
-        <div class="remplacement-props-note">צרו קשר עם מיכל אם תוכלו לקחת אחד מהשיעורים האלה 😊</div>
-      </div>`;
-    container.innerHTML = html;
-  } catch (e) {
-    container.innerHTML = '';
-  }
+  await LaviNotifications.refresh();
+  LaviNotifications.renderProposals();
 }
 
 // ── ONGLET 7 : DÉCLARER UNE ABSENCE ──
@@ -2687,6 +2663,7 @@ async function submitAbsence() {
 
   try {
     await api(BASE_COURS, TABLE_ABSENCES, '', 'POST', { records: [{ fields }] });
+    LaviNotifications.refresh(true);
     document.getElementById('tab-absence').innerHTML = `
       <div class="bakasha-card bakasha-success">
         <div class="success-icon">✅</div>
