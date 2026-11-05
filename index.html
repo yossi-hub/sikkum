@@ -2056,13 +2056,31 @@ async function submitPresence(classId) {
 
 // ── Remplacement d'un autre prof ──
 async function loadAllClassesLight() {
-  const fieldsParam = ['Numéro de Classe', 'Teacher en texte', 'Status']
+  const fieldsParam = ['Numéro de Classe', 'Teacher en texte', 'Status', 'Se termine le ']
     .map(f => `fields%5B%5D=${encodeURIComponent(f)}`)
     .join('&');
   const recs = await getAll(BASE_COURS, TABLE_CLASSES, `?${fieldsParam}`);
   allClassesLight = recs
     .filter(r => ['Complete', 'In Progress'].includes(r.fields['Status']))
-    .map(r => ({ id: r.id, num: r.fields['Numéro de Classe'] || r.id, teacher: r.fields['Teacher en texte'] || '' }));
+    .map(r => ({
+      id: r.id, num: r.fields['Numéro de Classe'] || r.id,
+      teacher: r.fields['Teacher en texte'] || '', status: r.fields['Status'],
+      endDate: (r.fields['Se termine le '] || [])[0] || ''
+    }));
+}
+
+function isReplacementClassSearchable(cls, now = new Date()) {
+  if (cls.status === 'In Progress') return true;
+  if (cls.status !== 'Complete' || !/^\d{4}-\d{2}-\d{2}$/.test(cls.endDate || '')) return false;
+  const end = new Date(cls.endDate + 'T00:00:00Z');
+  if (!Number.isFinite(end.getTime()) || end.toISOString().slice(0, 10) !== cls.endDate) return false;
+  // Comparer les jours calendaires à Paris, sans décalage lié aux changements d'heure.
+  const parts = Object.fromEntries(new Intl.DateTimeFormat('en', {
+    timeZone: 'Europe/Paris', year: 'numeric', month: '2-digit', day: '2-digit'
+  }).formatToParts(now).filter(p => p.type !== 'literal').map(p => [p.type, p.value]));
+  const today = Date.UTC(+parts.year, +parts.month - 1, +parts.day);
+  const daysSinceEnd = (today - end.getTime()) / 86400000;
+  return daysSinceEnd >= 0 && daysSinceEnd < 7;
 }
 
 async function onRemplacementSearch() {
@@ -2070,13 +2088,14 @@ async function onRemplacementSearch() {
   const resultsEl = document.getElementById('remp-results');
   if (!resultsEl) return;
   if (!q) { resultsEl.innerHTML = ''; return; }
-  if (!allClassesLight) {
+  if (!allClassesLight || allClassesLight.some(c => !c.status)) {
     resultsEl.innerHTML = `<div class="loading" style="padding:0.5rem;"><div class="spinner"></div></div>`;
     try { await loadAllClassesLight(); }
     catch (e) { resultsEl.innerHTML = `<div class="error-msg">Erreur : ${e.message}</div>`; return; }
   }
   const query = q.toLowerCase();
-  const matches = allClassesLight.filter(c => String(c.num).trim().toLowerCase() === query);
+  const matches = allClassesLight.filter(c =>
+    String(c.num).trim().toLowerCase() === query && isReplacementClassSearchable(c));
   if (!matches.length) {
     resultsEl.innerHTML = `<div class="submit-class-note" style="padding:0.5rem 0;">לא נמצאה כיתה</div>`;
     return;
