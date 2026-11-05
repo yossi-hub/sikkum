@@ -2075,7 +2075,8 @@ async function onRemplacementSearch() {
     try { await loadAllClassesLight(); }
     catch (e) { resultsEl.innerHTML = `<div class="error-msg">Erreur : ${e.message}</div>`; return; }
   }
-  const matches = allClassesLight.filter(c => String(c.num).toLowerCase().includes(q.toLowerCase())).slice(0, 8);
+  const query = q.toLowerCase();
+  const matches = allClassesLight.filter(c => String(c.num).trim().toLowerCase() === query);
   if (!matches.length) {
     resultsEl.innerHTML = `<div class="submit-class-note" style="padding:0.5rem 0;">לא נמצאה כיתה</div>`;
     return;
