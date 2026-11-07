@@ -155,6 +155,7 @@ input.pres-cours-input { max-width: 110px; direction: ltr; text-align: center; f
 input.pres-cours-input.missing { border-color: #f55700; box-shadow: 0 0 0 2px rgba(245,87,0,0.15); }
 .pres-cours-help { font-size: 12px; color: #2e2e2e; background: rgba(2,93,184,0.06); border-radius: 8px; padding: 8px 10px; line-height: 1.5; }
 .pres-cours-help b { color: #025db8; direction: ltr; unicode-bidi: isolate; }
+.pres-date-warning { font-size: 12px; color: #805310; background: #fff3d6; border: 1px solid #ecd39a; border-radius: 8px; padding: 8px 10px; line-height: 1.6; }
 .pres-students { display: flex; flex-direction: column; }
 .pres-row-wrap { display: flex; align-items: center; gap: 10px; padding: 6px 4px; border-bottom: 0.5px solid rgba(2,93,184,0.07); flex-wrap: wrap; }
 .pres-row-wrap:last-child { border-bottom: none; }
@@ -1208,7 +1209,7 @@ async function fetchClassesData(mySession) {
   const classRecs = {};
   await mapLimit(chunk(teacher.classIds, 20), 3, async batch => {
     const f = encodeURIComponent(`OR(${batch.map(id => `RECORD_ID()="${id}"`).join(',')})`);
-    const recs = await getAll(BASE_COURS, TABLE_CLASSES, `?filterByFormula=${f}`);
+    const recs = await getAll(BASE_COURS, TABLE_CLASSES, `?filterByFormula=${f}&returnFieldsByFieldId=true`);
     for (const r of recs) classRecs[r.id] = r;
   });
   const classes = [];
@@ -1216,8 +1217,8 @@ async function fetchClassesData(mySession) {
     const r = classRecs[cid];
     if (!r) continue;
     const f = r.fields;
-    if (!['Complete', 'In Progress'].includes(f['Status'])) continue;
-    classes.push({ id: cid, num: f['Numéro de Classe'] || f['Name'] || cid, chapitre: f['Chapitre en cours'] || '', niveau: f['Niveau'] || '', studentIds: f['Students'] || [], status: f['Status'] || '' });
+    if (!['Complete', 'In Progress'].includes(f[FLD_CL_STATUS])) continue;
+    classes.push({ id: cid, num: f[FLD_CL_NUM] || cid, chapitre: f[FLD_CL_CHAPITRE] || '', niveau: f[FLD_CL_NIVEAU] || '', studentIds: f[FLD_CL_STUDENTS] || [], status: f[FLD_CL_STATUS] || '', jour: f[FLD_CL_JOUR_TEXT] || '' });
   }
   if (mySession !== sessionId) return false;
 
@@ -1543,6 +1544,43 @@ function getTodayStr() {
   return `${y}-${m}-${day}`;
 }
 
+// Le jour prévu peut être du texte ou un lookup Airtable, en français ou en hébreu.
+function presenceDateWarning(jour, dateStr) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(dateStr || '')) return '';
+  const date = new Date(`${dateStr}T12:00:00Z`);
+  if (!Number.isFinite(date.getTime()) || date.toISOString().slice(0, 10) !== dateStr) return '';
+  const words = (Array.isArray(jour) ? jour.join(' ') : String(jour || ''))
+    .normalize('NFD').replace(/\p{M}/gu, '').toLowerCase().split(/[^\p{L}]+/u);
+  const dayNames = ['יום ראשון', 'יום שני', 'יום שלישי', 'יום רביעי', 'יום חמישי', 'יום שישי', 'שבת'];
+  const aliases = [
+    ['dimanche', 'sunday', 'ראשון'], ['lundi', 'monday', 'שני'],
+    ['mardi', 'tuesday', 'שלישי'], ['mercredi', 'wednesday', 'רביעי'],
+    ['jeudi', 'thursday', 'חמישי'], ['vendredi', 'friday', 'שישי', 'ששי'],
+    ['samedi', 'saturday', 'שבת']
+  ];
+  const scheduledDays = aliases.map((names, day) => names.some(name => words.includes(name)) ? day : -1).filter(day => day >= 0);
+  const chosenDay = date.getUTCDay(); // jour calendaire choisi, indépendant du fuseau de l'appareil
+  if (!scheduledDays.length || scheduledDays.includes(chosenDay)) return '';
+  const expected = scheduledDays.map(day => `ב${dayNames[day]}`).join(' או ');
+  return `⚠️ התאריך שנבחר חל ב${dayNames[chosenDay]}. השיעור מתקיים בדרך כלל ${expected}. כדאי לבדוק את התאריך לפני השמירה.`;
+}
+
+function presenceDateWarningHtml(id, jour, dateStr) {
+  const message = presenceDateWarning(jour, dateStr);
+  return `<div id="${id}" class="pres-date-warning infos-full" role="status" aria-live="polite" aria-atomic="true"${message ? '' : ' hidden'}>${escHtml(message)}</div>`;
+}
+
+function updatePresenceDateWarning(classId) {
+  const replacement = classId === undefined;
+  const cls = replacement ? remplacementSelected : state.classes.find(c => c.id === classId);
+  const input = document.getElementById(replacement ? 'remp-date' : `pres-date-${classId}`);
+  const warning = document.getElementById(replacement ? 'remp-date-warning' : `pres-date-warning-${classId}`);
+  if (!cls || !input || !warning) return;
+  const message = presenceDateWarning(cls.jour, input.value);
+  warning.textContent = message;
+  warning.hidden = !message;
+}
+
 function togglePresenceClass(classId) {
   const block = document.getElementById(`presblock-${classId}`);
   if (!block) return;
@@ -1830,13 +1868,14 @@ function buildPresenceHtml() {
         <div class="infos-classe">
           <div class="infos-grid">
             <div class="field-group" style="max-width:200px;">
-              <label class="field-label">תאריך</label>
-              <input type="date" class="field-input" id="pres-date-${cls.id}" value="${todayStr}" onchange="onPresenceDateChange('${cls.id}')" />
+              <label class="field-label" for="pres-date-${cls.id}">תאריך</label>
+              <input type="date" class="field-input" id="pres-date-${cls.id}" value="${todayStr}" aria-describedby="pres-date-warning-${cls.id}" oninput="updatePresenceDateWarning('${cls.id}')" onchange="onPresenceDateChange('${cls.id}')" />
             </div>
             <div class="field-group" style="max-width:160px;">
               <label class="field-label">פרק.שיעור *</label>
               <input type="text" inputmode="decimal" autocomplete="off" class="field-input pres-cours-input" id="pres-chapitre-${cls.id}" value="${escHtml(meta.chapitre)}" placeholder="1.3" oninput="onPresCoursInput(this)" />
             </div>
+            ${presenceDateWarningHtml(`pres-date-warning-${cls.id}`, cls.jour, todayStr)}
             <div class="field-group infos-full">
               <div class="pres-cours-help">✏️ יש לרשום את מספר הפרק ואת מספר השיעור, מופרדים בנקודה. לדוגמה: <b>1.3</b> = פרק 1, שיעור 3 · <b>8.7</b> = פרק 8, שיעור 7</div>
             </div>
@@ -1907,6 +1946,7 @@ async function onPresenceDateChange(classId) {
 async function loadAndRenderPresenceChecklist(classId, dateStr) {
   const cls = state.classes.find(c => c.id === classId);
   if (!cls) return;
+  updatePresenceDateWarning(classId);
   const listEl = document.getElementById(`pres-list-${classId}`);
   if (listEl) listEl.innerHTML = `<div class="loading" style="padding:1rem;"><div class="spinner"></div></div>`;
 
@@ -2118,9 +2158,9 @@ async function selectRemplacementClass(classId, dateStr) {
   const resultsEl = document.getElementById('remp-results');
   resultsEl.innerHTML = `<div class="loading" style="padding:0.5rem;"><div class="spinner"></div></div>`;
   try {
-    const clsRec = await api(BASE_COURS, TABLE_CLASSES, `/${classId}`);
+    const clsRec = await api(BASE_COURS, TABLE_CLASSES, `/${classId}?returnFieldsByFieldId=true`);
     if (mySession !== sessionId) return;
-    const studentIds = clsRec.fields['Students'] || [];
+    const studentIds = clsRec.fields[FLD_CL_STUDENTS] || [];
     const missingIds = studentIds.filter(id => !state.students[id]);
     for (let i = 0; i < missingIds.length; i += 10) {
       const batch = missingIds.slice(i, i + 10);
@@ -2129,7 +2169,7 @@ async function selectRemplacementClass(classId, dateStr) {
       if (mySession !== sessionId) return;
       for (const r of (res.records || [])) state.students[r.id] = (r.fields['Name'] || r.id).trim();
     }
-    remplacementSelected = { id: classId, num: light.num, teacher: light.teacher, studentIds };
+    remplacementSelected = { id: classId, num: light.num, teacher: light.teacher, studentIds, jour: clsRec.fields[FLD_CL_JOUR_TEXT] || '' };
     if (mySession !== sessionId) return;
     renderRemplacementConfirm();
     if (dateStr) await confirmRemplacement(dateStr);
@@ -2147,8 +2187,9 @@ function renderRemplacementConfirm() {
       <div style="font-size:13px;color:#555;margin-bottom:10px;">
         אתה עומד/ת לרשום נוכחות עבור כיתה <b>${r.num}</b> (המורה הקבוע/ה: ${r.teacher || '—'}), לתאריך:
       </div>
-      <input type="date" class="field-input" id="remp-date" value="${getTodayStr()}" style="max-width:180px;margin-bottom:12px;" />
-      <div style="display:flex;gap:10px;">
+      <input type="date" class="field-input" id="remp-date" value="${getTodayStr()}" aria-describedby="remp-date-warning" oninput="updatePresenceDateWarning()" onchange="updatePresenceDateWarning()" style="max-width:180px;margin-bottom:12px;" />
+      ${presenceDateWarningHtml('remp-date-warning', r.jour, getTodayStr())}
+      <div style="display:flex;gap:10px;margin-top:12px;">
         <button class="btn-blue" onclick="confirmRemplacement()">✓ אישור והמשך</button>
         <button class="btn-ghost" onclick="cancelRemplacement()">ביטול</button>
       </div>
@@ -2192,6 +2233,7 @@ async function confirmRemplacement(selectedDate) {
     document.getElementById('remp-results').innerHTML = `
       <div class="card" style="border-color:#f55700;">
         <div style="font-weight:600;margin-bottom:8px;">כיתה ${r.num} — החלפה (${r.teacher || '—'}) — ${dateStr}</div>
+        ${presenceDateWarningHtml('remp-date-warning', r.jour, dateStr)}
         <div class="infos-grid" style="margin-bottom:12px;">
           <div class="field-group" style="max-width:160px;">
             <label class="field-label">פרק.שיעור *</label>
