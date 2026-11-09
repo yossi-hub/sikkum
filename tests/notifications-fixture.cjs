@@ -8,6 +8,8 @@ const F = {
   absences: 'tblwISA3uDmqflwh4', history: 'tblaMErXMYZkVpyRD',
   notifications: 'tblSGA8alJE5Reev4', applications: 'tbl6TtLej3NuJX3ea',
   students: 'tblnFCt3Ne5oHwhlr', presence: 'tblDbn6AT04csXvWd',
+  rapports: 'tblpXR4YXdAhqlCqA', rClass: 'fld5pPY7sfAzWNFJB',
+  rTeacher: 'fldUqnBJ4rcoXUZw1', rStudent: 'fldv20CiFCcpI5D0a',
   absClass: 'fld4ydS6ZndZyDcAk', absDate: 'fld1RZ9dTN84WyRhT',
   absTeacher: 'fldCVfLoV3TXvTycH', replacement: 'fldpe4Y3zKJQCrMrK',
   num: 'fldcKQPOroEmSYmwE', level: 'fld2E7XYUsEBuPBPx', chapter: 'fldedo3AHC5u6o7pZ', hours: 'fldOT7CUfWymgpt6x',
@@ -60,7 +62,7 @@ function makeBackend() {
     ],
     [F.notifications]: [], [F.applications]: [],
     [F.students]: [{ id: id('S'), fields: { Name: 'תלמיד לדוגמה' } }],
-    [F.presence]: []
+    [F.presence]: [], [F.rapports]: []
   };
   const backend = {
     data, alice, beth, carol, classId, offerId,
@@ -79,7 +81,7 @@ function makeBackend() {
     const prefix = formula.match(/LEFT\([^,]+,\d+\)="([^"]*)"/);
     if (prefix) rows = rows.filter(r => String(r.fields[F.nKey] || '').startsWith(prefix[1]));
     const exact = formula.match(/^\{([^}]+)\}="([^"]*)"$/);
-    if (exact) rows = rows.filter(r => String(r.fields[exact[1]] || '') === exact[2]);
+    if (exact) rows = rows.filter(r => String(r.fields[exact[1]] ?? r.fields[{ Prof: F.rTeacher }[exact[1]]] ?? '') === exact[2]);
     if (table === F.classes && formula.startsWith('OR(')) {
       rows = rows.filter(r => formula.includes(r.id));
     }
@@ -178,7 +180,7 @@ function loadApp(backend = makeBackend(), actor = backend.alice, now = NOW) {
   vm.runInContext(source.replace(/\ninit\(\);\s*$/, '\n'), context);
   vm.runInContext(
     'api = __api; getAll = __getAll; loadLieuxMap = async () => ({siteDemo:"Paris — aperçu"});' +
-    'state.teacher = {id:__actor.id,name:__actor.fields.Name,email:__actor.fields.Email,classIds:[]};',
+    'state.teacher = {id:__actor.id,name:__actor.fields.Name,email:__actor.fields.Email,classIds:__actor.fields["Classes 5786"]||[]};',
     context
   );
   return { context, feature: context.LaviNotifications, document,
@@ -195,7 +197,7 @@ function buildPreview(destination) {
   source = source.replace('<script src="notifications.js"></script>', bootstrap + '<script src="notifications.js"></script>');
   const setup =
     'api=previewBackend.api;getAll=previewBackend.getAll;loadLieuxMap=async()=>({siteDemo:"Paris — aperçu"});' +
-    'state.teacher={id:previewBackend.alice.id,name:previewBackend.alice.fields.Name,email:previewBackend.alice.fields.Email,classIds:[]};' +
+    'state.teacher={id:previewBackend.alice.id,name:previewBackend.alice.fields.Name,email:previewBackend.alice.fields.Email,classIds:previewBackend.alice.fields["Classes 5786"]||[]};' +
     'renderTabsBar();renderHeaderUser(state.teacher);renderWelcome();';
   source = source.replace(/\ninit\(\);\s*<\/script>/, '\n' + setup + '\n</script>');
   source = source.replace('</body>', '<div style="position:fixed;bottom:0;left:0;right:0;background:#fff4d8;color:#735b11;text-align:center;font:12px sans-serif;padding:6px;z-index:999">Aperçu — données fictives, aucun e-mail envoyé</div></body>');
