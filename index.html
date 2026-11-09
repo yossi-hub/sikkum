@@ -6,6 +6,7 @@
 <title>Lavi's Teacher App</title>
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link rel="preconnect" href="https://api.airtable.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=League+Spartan:wght@400;500;700&family=Poppins:wght@400;500&display=swap" rel="stylesheet" media="print" onload="this.media='all'" />
 <!-- Chargé sans bloquer l'affichage : initGoogleSignIn() attend que le script soit prêt -->
 <script src="https://accounts.google.com/gsi/client" async></script>
@@ -66,8 +67,6 @@ body { font-family: 'Poppins', -apple-system, sans-serif; background: #f0ede8; c
 .tab-btn { padding: 10px 18px; font-family: 'League Spartan', sans-serif; font-size: 14px; font-weight: 600; color: rgba(255,255,255,0.65); background: transparent; border: none; border-bottom: 3px solid transparent; cursor: pointer; transition: color .15s, border-color .15s; white-space: nowrap; }
 .tab-btn:hover { color: rgba(255,255,255,0.9); }
 .tab-btn.active { color: #fff; border-bottom-color: #f55700; }
-.course-report-dot { display:inline-block; width:8px; height:8px; margin-inline-start:7px; border-radius:50%; background:#ed4540; vertical-align:middle; }
-.course-report-dot[hidden] { display:none; }
 .tabs-content { margin-top: 1.5rem; }
 .tab-panel { display: none; }
 .tab-panel.active { display: block; }
@@ -367,6 +366,7 @@ const TABLE_PRESENCE    = 'tblVpk0mZAYBAuCGG';
 const TABLE_RAPPORTS    = 'tblpXR4YXdAhqlCqA';
 const TABLE_BAKASHA     = 'tblB5HHBdDDQbn0Hc';
 const TABLE_PRESENCES_JOUR = 'tblDbn6AT04csXvWd'; // table "Présence" (base Cours 5786) — saisie quotidienne par les profs
+const AIRTABLE_KEY      = 'patQN9qTSmLV5aKkl.27894395be4f0d150d7d26f35598c9e9fefdef6ee976dbad3dfecb9464a602f8';
 
 // Champs de TABLE_PRESENCES_JOUR (lecture/écriture par ID de champ, avec returnFieldsByFieldId=true)
 const FLD_PRES_ELEVE   = 'fldB3PvFigjgvYmWM'; // Elève (link -> Students)
@@ -471,7 +471,6 @@ const SUPER_ADMIN_EMAILS = ['yossi@oulpanlavi.com'];
 let extraAdminEmails = [];
 
 let sentClasses = {};
-let pendingCourseReportIds = new Set();
 let adminSessionActive = false;
 let adminSessionEmail = null;
 let adminTeachersList = null;
@@ -523,9 +522,8 @@ async function waitRateSlot(base) {
 }
 
 async function api(base, table, params='', method='GET', body=null) {
-  const url = `/api/airtable/${base}/${table}${params}`;
-  const opts = { method: method || 'GET', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' } };
-  if (state.teacher?.email) opts.headers['X-Lavi-Teacher'] = state.teacher.email.trim().toLowerCase();
+  const url = `https://api.airtable.com/v0/${base}/${table}${params}`;
+  const opts = { method: method || 'GET', headers: { 'Authorization': 'Bearer ' + AIRTABLE_KEY, 'Content-Type': 'application/json' } };
   if (body) opts.body = JSON.stringify(body);
   for (let attempt = 0; ; attempt++) {
     await waitRateSlot(base);
@@ -589,37 +587,8 @@ function renderTabsBar() {
   if (!bar) return;
   bar.innerHTML = TAB_ORDER
     .filter(key => !hiddenTabsSet.has(key))
-    .map(key => `<button class="tab-btn" data-tab="${key}" onclick="switchTab('${key}')">${TAB_DEFS[key].icon} ${TAB_DEFS[key].title}${key === 'sikkum' ? courseReportDotHtml('sikkum-tab-dot') : ''}</button>`)
+    .map(key => `<button class="tab-btn" data-tab="${key}" onclick="switchTab('${key}')">${TAB_DEFS[key].icon} ${TAB_DEFS[key].title}</button>`)
     .join('');
-}
-
-function courseReportDotHtml(id) {
-  return `<span id="${id}" class="course-report-dot" role="img" aria-label="יש דוחות סיום קורס למילוי"${pendingCourseReportIds.size ? '' : ' hidden'}></span>`;
-}
-
-function updateCourseReportIndicators() {
-  for (const id of ['sikkum-tab-dot', 'sikkum-home-dot']) {
-    const dot = document.getElementById(id);
-    if (dot) dot.hidden = pendingCourseReportIds.size === 0;
-  }
-}
-
-// Un enregistrement est créé par élève : un envoi interrompu reste à compléter.
-function courseReportIsSent(cls, records) {
-  return records.length >= Math.max(1, cls.studentIds.length);
-}
-
-function sikkumClasses() {
-  return state.classes.filter(c => c.status === 'Complete');
-}
-
-function invalidateCourseReportClasses() {
-  classesPromise = null;
-  classesLoaded = false;
-  if (document.getElementById('tabs-content')?.style.display === 'block' &&
-      document.getElementById('tab-sikkum')?.classList.contains('active') && !classesLoading) {
-    loadClasses('sikkum');
-  }
 }
 
 async function loadHiddenTabs() {
@@ -702,8 +671,6 @@ function resetTeacherState() {
   absenceClassesLoading = false;
   absenceClassesLoaded = false;
   sentClasses = {};
-  pendingCourseReportIds.clear();
-  updateCourseReportIndicators();
   allClassesLight = null;
   remplacementSelected = null;
   state = { teacher: null, classes: [], students: {}, presences: {}, rapportRecords: {}, presenceRecordsToday: {}, presenceCache: {}, presenceMeta: {}, presenceHistory: {}, annuaire: [], mesclasses: [], absenceClasses: [] };
@@ -745,10 +712,10 @@ function saveTeacherSession() {
 
 // Au démarrage : si une session existe, on affiche tout de suite l'accueil
 // (à partir des infos mémorisées) puis on rafraîchit discrètement en arrière-plan.
-function restoreSession(serverSession) {
+function restoreSession() {
   const s = readSession();
-  if (!s || s.email !== serverSession.email || (!serverSession.isAdmin && s.teacherEmail !== serverSession.email)) return false;
-  const isAdmin = serverSession.isAdmin;
+  if (!s) return false;
+  const isAdmin = !!s.isAdmin || SUPER_ADMIN_EMAILS.includes(s.email);
   if (isAdmin) { adminSessionActive = true; adminSessionEmail = s.email; }
   if (!s.teacher) {
     // Admin qui n'avait pas encore choisi de prof
@@ -798,29 +765,14 @@ async function refreshRestoredSession(s) {
   if (mySession === sessionId) prefetchClasses().catch(() => {});
 }
 
-async function init() {
+function init() {
   adminSessionActive = false;
   adminSessionEmail = null;
   resetTeacherState();
   renderHeaderDefault();
   hideTabs();
-  loading('מתחבר...');
-  try {
-    const response = await fetch('/api/session', { credentials: 'same-origin' });
-    if (response.status === 401) { clearSession(); renderLogin(); return; }
-    if (!response.ok) throw new Error('לא ניתן לאמת את החיבור כרגע.');
-    const verified = await response.json();
-    if (restoreSession(verified)) return;
-    if (verified.isAdmin) {
-      adminSessionActive = true;
-      adminSessionEmail = verified.email;
-      writeSession({ email: verified.email, isAdmin: true });
-      await loadAdminEmails();
-      await showAdminPicker();
-    } else {
-      await loginByEmail(verified.email);
-    }
-  } catch (e) { renderLogin('לא ניתן לאמת את החיבור כרגע. אפשר לנסות שוב.'); }
+  if (restoreSession()) return;
+  renderLogin();
 }
 
 function switchAdminTeacher() {
@@ -867,17 +819,33 @@ function initGoogleSignIn(allowAuto) {
   }
 }
 
+function decodeJwt(token) {
+  const base64Url = token.split('.')[1];
+  const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+  const jsonPayload = decodeURIComponent(
+    atob(base64).split('').map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)).join('')
+  );
+  return JSON.parse(jsonPayload);
+}
+
 async function handleGoogleCredential(response) {
   try {
-    const sessionResponse = await fetch('/api/session', {
-      method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ credential: response.credential })
-    });
-    if (!sessionResponse.ok) { renderLogin('החיבור נדחה. יש להתחבר עם חשבון מורה מאומת של Oulpan Lavi.'); return; }
-    const verified = await sessionResponse.json();
-    const email = verified.email;
+    const payload = decodeJwt(response.credential);
+    const email = (payload.email || '').trim().toLowerCase();
+
+    if (payload.email_verified === false) {
+      renderLogin('חשבון הגוגל שלך אינו מאומת.');
+      return;
+    }
+
+    const domain = email.split('@')[1] || '';
+    if (domain !== ALLOWED_DOMAIN) {
+      renderLogin(`יש להתחבר עם חשבון @${ALLOWED_DOMAIN} בלבד.`);
+      return;
+    }
+
     await loadAdminEmails();
-    if (verified.isAdmin) {
+    if (isAdminEmail(email)) {
       adminSessionActive = true;
       adminSessionEmail = email;
       clearSession();
@@ -891,14 +859,7 @@ async function handleGoogleCredential(response) {
   }
 }
 
-async function logout() {
-  try {
-    const response = await fetch('/api/session', { method: 'DELETE', credentials: 'same-origin' });
-    if (!response.ok) throw new Error('Logout failed');
-  } catch (_) {
-    setRoot('<div class="error-msg">לא ניתן להתנתק כרגע. יש לנסות שוב.</div>');
-    return;
-  }
+function logout() {
   clearSession();
   if (window.google && google.accounts && google.accounts.id) {
     google.accounts.id.disableAutoSelect();
@@ -958,7 +919,7 @@ function renderWelcome() {
       return `
         <div class="welcome-card" onclick="openTab('${key}')">
           <div class="welcome-card-icon">${t.icon}</div>
-          <div class="welcome-card-title">${t.title}${key === 'sikkum' ? courseReportDotHtml('sikkum-home-dot') : ''}</div>
+          <div class="welcome-card-title">${t.title}</div>
           <div class="welcome-card-desc">${t.desc}</div>
         </div>`;
     }).join('');
@@ -1285,8 +1246,7 @@ async function fetchClassesData(mySession) {
     const rapports = await getAll(BASE_COURS, TABLE_RAPPORTS, `?filterByFormula=${formula}&returnFieldsByFieldId=true`);
     for (const cls of classes) {
       const recs = rapports.filter(r => String(r.fields['fld5pPY7sfAzWNFJB'] || '').trim() === String(cls.num).trim());
-      if (recs.length) rapportRecords[cls.id] = recs;
-      if (courseReportIsSent(cls, recs)) newSent[cls.id] = 'sent';
+      if (recs.length) { newSent[cls.id] = 'sent'; rapportRecords[cls.id] = recs; }
     }
   };
 
@@ -1322,8 +1282,6 @@ async function fetchClassesData(mySession) {
   state.presences = presences;
   state.rapportRecords = rapportRecords;
   sentClasses = newSent;
-  pendingCourseReportIds = new Set(classes.filter(c => c.status === 'Complete' && newSent[c.id] !== 'sent').map(c => c.id));
-  updateCourseReportIndicators();
   state.presenceRecordsToday = presenceRecordsToday;
   state.presenceMeta = presenceMeta;
   return true;
@@ -1363,11 +1321,7 @@ function toggleClass(classId) {
 }
 
 function renderSikkumTab() {
-  // Conserver les saisies non envoyées lors de l'arrivée d'une nouvelle classe.
-  const drafts = Array.from(document.getElementById('tab-sikkum').querySelectorAll('.classe-block:not(.sent) input, .classe-block:not(.sent) textarea, .classe-block:not(.sent) select'))
-    .map(el => ({ id: el.id, value: el.value }));
-  const classes = sikkumClasses();
-  const allSent = classes.length > 0 && classes.every(c => sentClasses[c.id] === 'sent');
+  const allSent = state.classes.length > 0 && state.classes.every(c => sentClasses[c.id] === 'sent');
   let banner = '';
   if (allSent) {
     banner = `
@@ -1378,29 +1332,21 @@ function renderSikkumTab() {
     </div>`;
   }
   setTab('sikkum', banner + buildSikkumHtml());
-  for (const draft of drafts) {
-    const input = document.getElementById(draft.id);
-    if (input && !input.disabled) input.value = draft.value;
-  }
-  updateCourseReportIndicators();
 }
 
 function buildSikkumHtml() {
   const t = state.teacher;
-  const classes = sikkumClasses();
   let html = `
     <div class="prof-header">
       <div>
         <div class="prof-name">${t.name}</div>
-        <div class="prof-meta">${classes.length} ${classes.length !== 1 ? 'כיתות' : 'כיתה'} • שנת 5786</div>
+        <div class="prof-meta">${state.classes.length} ${state.classes.length !== 1 ? 'כיתות' : 'כיתה'} • שנת 5786</div>
       </div>
     </div>`;
 
-  if (!classes.length) return html + '<div class="notification-empty">אין כרגע כיתות שהסתיימו. דוח סיום קורס יופיע כאן לאחר סיום הכיתה.</div>';
-
-  classes.forEach(cls => {
+  state.classes.forEach((cls, idx) => {
     const isSent = sentClasses[cls.id] === 'sent';
-    const firstUnsent = classes.find(c => sentClasses[c.id] !== 'sent');
+    const firstUnsent = state.classes.find(c => sentClasses[c.id] !== 'sent');
     const isOpen = firstUnsent ? cls.id === firstUnsent.id : false;
     html += `
     <div class="classe-block${isSent?' sent':''}${isOpen?' open':''}" id="block-${cls.id}">
@@ -1467,8 +1413,8 @@ function buildSikkumHtml() {
 
     html += `</tbody></table></div>
         <div class="class-submit-area">
-          <div class="submit-class-note">${!cls.studentIds.length ? 'לא משויכים תלמידים לכיתה. יש לפנות להנהלה לפני שליחת הדוח.' : isSent ? 'Classe enregistrée dans Airtable ✓' : 'Enregistre uniquement cette classe'}</div>
-          <button class="btn-submit-class${isSent?' done':''}" id="btn-${cls.id}" onclick="submitClass('${cls.id}')" ${isSent || !cls.studentIds.length ? 'disabled' : ''}>${isSent ? '✓ נשלח' : '✉ שמירה ושליחה'}</button>
+          <div class="submit-class-note">${isSent ? 'Classe enregistrée dans Airtable ✓' : 'Enregistre uniquement cette classe'}</div>
+          <button class="btn-submit-class${isSent?' done':''}" id="btn-${cls.id}" onclick="submitClass('${cls.id}')" ${isSent?'disabled':''}>${isSent ? '✓ נשלח' : '✉ שמירה ושליחה'}</button>
         </div>
       </div>
     </div>`;
@@ -1520,8 +1466,7 @@ function enableEditClass(classId) {
 
 async function submitClass(classId) {
   const cls = state.classes.find(c => c.id === classId);
-  if (!cls || cls.status !== 'Complete' || !cls.studentIds.length) return;
-  const mySession = sessionId;
+  if (!cls) return;
   const isEditing = !!(state.rapportRecords[classId] && state.rapportRecords[classId].length);
   const btn = document.getElementById(`btn-${classId}`);
   if (btn) { btn.disabled = true; btn.textContent = isEditing ? 'מעדכן...' : 'שומר...'; }
@@ -1564,25 +1509,20 @@ async function submitClass(classId) {
   try {
     const savedRecords = [];
     for (let i = 0; i < toUpdate.length; i += 10) {
-      if (mySession !== sessionId) return;
       const res = await api(BASE_COURS, TABLE_RAPPORTS, '', 'PATCH', { records: toUpdate.slice(i, i + 10), returnFieldsByFieldId: true });
       savedRecords.push(...(res.records || []));
     }
     for (let i = 0; i < toCreate.length; i += 10) {
-      if (mySession !== sessionId) return;
       const res = await api(BASE_COURS, TABLE_RAPPORTS, '', 'POST', { records: toCreate.slice(i, i + 10), returnFieldsByFieldId: true });
       savedRecords.push(...(res.records || []));
     }
 
-    if (mySession !== sessionId) return;
     sentClasses[classId] = 'sent';
     state.rapportRecords[classId] = savedRecords;
-    pendingCourseReportIds.delete(classId);
-    LaviNotifications.courseReportSaved(classId);
 
     renderSikkumTab();
 
-    const nextCls = sikkumClasses().find(c => !sentClasses[c.id]);
+    const nextCls = state.classes.find(c => !sentClasses[c.id]);
     if (nextCls) {
       const nextBlock = document.getElementById(`block-${nextCls.id}`);
       if (nextBlock) nextBlock.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -1590,7 +1530,6 @@ async function submitClass(classId) {
       document.getElementById('tab-sikkum')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
   } catch(e) {
-    if (mySession !== sessionId) return;
     if (btn) { btn.disabled = false; btn.textContent = isEditing ? '✎ עדכון ושמירה' : '✉ שמירה ושליחה'; }
     document.getElementById(`block-${classId}`)?.insertAdjacentHTML('afterbegin', `<div class="error-msg" style="margin:0.75rem 1.25rem;">Erreur : ${e.message}</div>`);
   }

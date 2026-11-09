@@ -1,7 +1,0 @@
-{
-  "name": "lavi-teachers-app",
-  "private": true,
-  "type": "module",
-  "scripts": { "test": "node --test tests/*.test.cjs" },
-  "dependencies": { "jose": "^6.0.0" }
-}
