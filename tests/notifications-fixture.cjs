@@ -8,6 +8,10 @@ const F = {
   absences: 'tblwISA3uDmqflwh4', history: 'tblaMErXMYZkVpyRD',
   notifications: 'tblSGA8alJE5Reev4', applications: 'tbl6TtLej3NuJX3ea',
   students: 'tblnFCt3Ne5oHwhlr', presence: 'tblDbn6AT04csXvWd',
+  pStudent: 'fldB3PvFigjgvYmWM', pClass: 'fldVLXXtLgaVuEwAo',
+  pDate: 'fldMOUWRqgoR0rYe7', pPresent: 'fld6XD60QTpapL0Jq',
+  pTeacher: 'fldS9wwl4L5TtJ44z', pChapter: 'flds4EL8IOmAg52LK',
+  pLesson: 'fldepIP0jRgERjfZW', pMotif: 'fldTvwnoKFjh0a0sk',
   rapports: 'tblpXR4YXdAhqlCqA', rClass: 'fld5pPY7sfAzWNFJB',
   rTeacher: 'fldUqnBJ4rcoXUZw1', rStudent: 'fldv20CiFCcpI5D0a',
   absClass: 'fld4ydS6ZndZyDcAk', absDate: 'fld1RZ9dTN84WyRhT',
@@ -81,7 +85,14 @@ function makeBackend() {
     const prefix = formula.match(/LEFT\([^,]+,\d+\)="([^"]*)"/);
     if (prefix) rows = rows.filter(r => String(r.fields[F.nKey] || '').startsWith(prefix[1]));
     const exact = formula.match(/^\{([^}]+)\}="([^"]*)"$/);
-    if (exact) rows = rows.filter(r => String(r.fields[exact[1]] ?? r.fields[{ Prof: F.rTeacher }[exact[1]]] ?? '') === exact[2]);
+    if (exact) rows = rows.filter(r => String(r.fields[exact[1]] ?? r.fields[{ Prof: F.rTeacher, Classes: F.pClass }[exact[1]]] ?? '') === exact[2]);
+    if (table === F.presence) {
+      const date = formula.match(/IS_SAME\(\{Date\},"([^"]+)"/);
+      if (date) rows = rows.filter(r => String(r.fields[F.pDate] || '').slice(0, 10) === date[1]);
+      const classes = [...formula.matchAll(/\{Classes\}="((?:\\.|[^"\\])*)"/g)]
+        .map(match => JSON.parse('"' + match[1] + '"'));
+      if (classes.length) rows = rows.filter(r => classes.includes(String(r.fields[F.pClass])));
+    }
     if (table === F.classes && formula.startsWith('OR(')) {
       rows = rows.filter(r => formula.includes(r.id));
     }
