@@ -46,14 +46,17 @@
   let selectedKey = null;
   let teacherCache = null;
   let actionMessage = '';
+  let courseUIInstalled = false;
+  let attendanceUIInstalled = false;
   const applying = new Set();
   const locallySaved = new Set();
+  const locallySavedCourses = new Set();
 
   function emptyModel() {
     return {
       teacherId: null, items: [], offers: new Map(), openIds: new Set(),
       applications: new Set(), reports: [], classInfo: new Map(),
-      refreshed: 0, error: '', loaded: false
+      courseSignature: '', pendingCourseIds: new Set(), refreshed: 0, error: '', loaded: false
     };
   }
   function textValue(value) {
@@ -90,6 +93,24 @@
     if (!Number.isFinite(d.getTime()) || d.toISOString().slice(0, 10) !== date) return '';
     d.setUTCDate(d.getUTCDate() + days);
     return d.toISOString().slice(0, 10);
+  }
+  function suggestedAttendanceDate(jour, today) {
+    if (!addDays(today, 0)) return '';
+    const words = textValue(jour).normalize('NFD').replace(/\p{M}/gu, '')
+      .toLowerCase().split(/[^\p{L}]+/u);
+    const aliases = [
+      ['dimanche', 'sunday', 'ראשון'], ['lundi', 'monday', 'שני'],
+      ['mardi', 'tuesday', 'שלישי'], ['mercredi', 'wednesday', 'רביעי'],
+      ['jeudi', 'thursday', 'חמישי'], ['vendredi', 'friday', 'שישי', 'ששי'],
+      ['samedi', 'saturday', 'שבת']
+    ];
+    const days = aliases.map(function (names, day) {
+      return names.some(function (name) { return words.includes(name); }) ? day : -1;
+    }).filter(function (day) { return day >= 0; });
+    if (!days.length) return today;
+    const weekday = new Date(today + 'T12:00:00Z').getUTCDay();
+    const daysAgo = Math.min.apply(null, days.map(function (day) { return (weekday - day + 7) % 7; }));
+    return addDays(today, -daysAgo);
   }
   function dueInstant(date) {
     const due = addDays(date, 2);
@@ -161,7 +182,223 @@
     if (dot) dot.hidden = !hasUnread;
     if (button) button.setAttribute('aria-label', hasUnread ? 'עדכונים — יש עדכונים שלא נקראו' : 'עדכונים');
   }
+  function completedClasses() {
+    return state.classes.filter(function (cls) { return cls.status === 'Complete'; });
+  }
+  function withCompletedClasses(render, context, args) {
+    const allClasses = state.classes;
+    state.classes = completedClasses();
+    try { return render.apply(context, args); }
+    finally { state.classes = allClasses; }
+  }
+  function courseReportIsSent(_cls, records) {
+    // Même règle que le formulaire existant pour les bilans déjà enregistrés.
+    return records.length > 0;
+  }
+  function updateCourseReportBadge() {
+    function dotHtml(id) {
+      return '<span id="' + id + '" class="course-report-dot" role="img" aria-label="יש דוחות סיום קורס למילוי" hidden></span>';
+    }
+    const bar = document.getElementById('tabs-bar');
+    if (bar && !document.getElementById('sikkum-tab-dot')) {
+      const next = bar.innerHTML.replace(/(<button\b[^>]*\bdata-tab="sikkum"[^>]*>[\s\S]*?)(<\/button>)/,
+        '$1' + dotHtml('sikkum-tab-dot') + '$2');
+      if (next !== bar.innerHTML) bar.innerHTML = next;
+    }
+    const root = document.getElementById('root');
+    if (root && !document.getElementById('sikkum-home-dot')) {
+      const next = root.innerHTML.replace(/(<div class="welcome-card" onclick="openTab\('sikkum'\)">[\s\S]*?<div class="welcome-card-title">[\s\S]*?)(<\/div>)/,
+        '$1' + dotHtml('sikkum-home-dot') + '$2');
+      if (next !== root.innerHTML) root.innerHTML = next;
+    }
+    for (const id of ['sikkum-tab-dot', 'sikkum-home-dot']) {
+      const dot = document.getElementById(id);
+      if (dot) dot.hidden = model.pendingCourseIds.size === 0;
+    }
+  }
+  function pendingFromLoadedClasses() {
+    model.pendingCourseIds = new Set(completedClasses().filter(function (cls) {
+      return sentClasses[cls.id] !== 'sent' && !locallySavedCourses.has(cls.id);
+    }).map(function (cls) { return cls.id; }));
+    updateCourseReportBadge();
+  }
+  function invalidateCourseReportClasses() {
+    // Recharger au prochain accès au bilan ; ne pas remplacer un formulaire en cours.
+    classesPromise = null;
+    classesLoaded = false;
+  }
+  function installCourseReportUI() {
+    if (courseUIInstalled) return;
+    courseUIInstalled = true;
+    // Le module est chargé avant le script principal. Ces adaptations sont donc
+    // installées au démarrage du compte, une fois les fonctions de l'app disponibles.
+    // L'affichage du bilan est filtré sans modifier les classes utilisées par נוכחות.
+    const originalBuild = buildSikkumHtml;
+    buildSikkumHtml = function () {
+      const result = withCompletedClasses(originalBuild, this, arguments);
+      return result + (completedClasses().length ? '' :
+        '<div class="notification-empty">אין כרגע כיתות שהסתיימו. דוח סיום קורס יופיע כאן לאחר סיום הכיתה.</div>');
+    };
+    const originalRender = renderSikkumTab;
+    renderSikkumTab = function () {
+      const panel = document.getElementById('tab-sikkum');
+      const drafts = panel ? Array.from(panel.querySelectorAll('input:enabled, textarea:enabled, select:enabled'))
+        .map(function (input) { return { id: input.id, value: input.value }; }) : [];
+      const result = withCompletedClasses(originalRender, this, arguments);
+      for (const draft of drafts) {
+        const input = document.getElementById(draft.id);
+        if (input && !input.disabled) input.value = draft.value;
+      }
+      updateCourseReportBadge();
+      return result;
+    };
+    const originalTabs = renderTabsBar;
+    renderTabsBar = function () {
+      const result = originalTabs.apply(this, arguments);
+      updateCourseReportBadge();
+      return result;
+    };
+    const originalWelcome = renderWelcome;
+    renderWelcome = function () {
+      const result = originalWelcome.apply(this, arguments);
+      updateCourseReportBadge();
+      return result;
+    };
+    const originalFetch = fetchClassesData;
+    fetchClassesData = async function () {
+      const capture = captureSession();
+      const loaded = await originalFetch.apply(this, arguments);
+      if (loaded && current(capture)) pendingFromLoadedClasses();
+      return loaded;
+    };
+    const originalSubmit = submitClass;
+    submitClass = async function (classId) {
+      const cls = completedClasses().find(function (c) { return c.id === classId; });
+      if (!cls || !cls.studentIds.length) return;
+      const capture = captureSession();
+      const result = await originalSubmit.apply(this, arguments);
+      if (current(capture) && sentClasses[classId] === 'sent') {
+        await courseReportSaved(classId);
+        const next = completedClasses().find(function (c) { return sentClasses[c.id] !== 'sent'; });
+        const target = document.getElementById(next ? 'block-' + next.id : 'tab-sikkum');
+        if (target) target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+      return result;
+    };
+    if (!document.getElementById('course-report-style')) {
+      const style = document.createElement('style');
+      style.id = 'course-report-style';
+      style.textContent = '.course-report-dot{display:inline-block;width:8px;height:8px;margin-inline-start:7px;border-radius:50%;background:#ed4540;vertical-align:middle}.course-report-dot[hidden]{display:none}';
+      (document.head || document.body).appendChild(style);
+    }
+  }
+  function installAttendanceDateUI() {
+    if (attendanceUIInstalled) return;
+    attendanceUIInstalled = true;
+    // Charger la séance proposée avant de permettre la saisie : les présences
+    // préchargées par l'app correspondent au jour courant, pas forcément au cours.
+    loadAndRenderPresenceChecklist = async function (classId, dateStr) {
+      const cls = state.classes.find(function (c) { return c.id === classId; });
+      const input = document.getElementById('pres-date-' + classId);
+      if (!cls || !input || input.value !== dateStr || !state.teacher) return;
+      const capture = captureSession();
+      const cache = { dateStr: dateStr, existingMap: {}, loading: true };
+      state.presenceCache[classId] = cache;
+      const list = document.getElementById('pres-list-' + classId);
+      const chapter = document.getElementById('pres-chapitre-' + classId);
+      const lesson = document.getElementById('pres-lecon-' + classId);
+      const button = document.getElementById('pres-btn-' + classId);
+      const errorBox = document.getElementById('pres-error-' + classId);
+      const badge = document.getElementById('pres-status-' + classId);
+      const block = document.getElementById('presblock-' + classId);
+      function selected() {
+        return current(capture) && document.getElementById(input.id) === input &&
+          input.value === dateStr && state.presenceCache[classId] === cache;
+      }
+      updatePresenceDateWarning(classId);
+      if (button) button.disabled = true;
+      for (const field of [chapter, lesson]) {
+        if (field) { field.value = ''; field.disabled = true; }
+      }
+      if (list) list.innerHTML = '<div class="loading" style="padding:1rem;"><div class="spinner"></div></div>';
+      if (errorBox) errorBox.innerHTML = '';
+      if (badge) badge.style.display = 'none';
+      if (block) block.classList.remove('sent');
+      try {
+        if (!addDays(dateStr, 0)) throw new Error('Invalid date');
+        const formula = 'AND({Classes}=' + formulaString(cls.num) +
+          ',IS_SAME({Date},' + formulaString(dateStr) + ",'day'))";
+        const records = await getAll(BASE_COURS, TABLE_PRESENCES_JOUR,
+          query([], formula));
+        // Une réponse lente ne doit écraser ni une nouvelle date ni un autre compte.
+        if (!selected()) return;
+        for (const record of records) {
+          const fields = record.fields;
+          const sid = (fields[FLD_PRES_ELEVE] || [])[0];
+          if (sid) cache.existingMap[sid] = { recordId: record.id,
+            present: !!fields[FLD_PRES_PRESENT], motif: fields[FLD_PRES_MOTIF] || '' };
+        }
+        const fields = records.length ? records[0].fields : {};
+        const meta = { chapitre: fields[FLD_PRES_CHAPITRE] == null ? '' : fields[FLD_PRES_CHAPITRE],
+          lecon: fields[FLD_PRES_LECON] || '' };
+        state.presenceMeta[classId] = meta;
+        if (chapter) { chapter.value = String(meta.chapitre); chapter.classList.remove('missing'); }
+        if (lesson) lesson.value = meta.lecon;
+        if (list) list.innerHTML = buildStudentChecklist(cls, cache.existingMap);
+        if (badge) {
+          badge.style.display = records.length ? 'inline-block' : 'none';
+          badge.textContent = dateStr === getTodayStr() ? '✓ נרשם היום' : '✓ נרשם לתאריך זה';
+        }
+        if (block && records.length) block.classList.add('sent');
+        cache.loading = false;
+        cache.loaded = true;
+        for (const field of [chapter, lesson, button]) { if (field) field.disabled = false; }
+        renderPresenceHistory(classId);
+      } catch (_) {
+        if (!selected()) return;
+        cache.loading = false;
+        cache.loaded = false;
+        for (const field of [chapter, lesson, button]) { if (field) field.disabled = true; }
+        if (list) list.innerHTML = '';
+        if (errorBox) errorBox.innerHTML = '<div class="error-msg">לא ניתן לטעון את הנוכחות לתאריך זה. ' +
+          '<button type="button" class="btn-ghost" onclick="onPresenceDateChange(\'' + html(classId) + '\')">ניסיון נוסף</button></div>';
+      }
+    };
+    const originalRender = renderPresenceTab;
+    renderPresenceTab = function () {
+      const result = originalRender.apply(this, arguments);
+      const today = getTodayStr();
+      const loads = state.classes.filter(function (cls) { return cls.status !== 'Complete'; }).map(function (cls) {
+        const input = document.getElementById('pres-date-' + cls.id);
+        if (!input) return;
+        input.value = suggestedAttendanceDate(cls.jour, today);
+        return loadAndRenderPresenceChecklist(cls.id, input.value);
+      });
+      return Promise.all(loads).then(function () { return result; });
+    };
+    const originalSubmit = submitPresence;
+    submitPresence = async function (classId) {
+      const input = document.getElementById('pres-date-' + classId);
+      const cache = state.presenceCache[classId];
+      if (!input || input.disabled || !cache || !cache.loaded || cache.dateStr !== input.value) return;
+      input.disabled = true;
+      try { return await originalSubmit.apply(this, arguments); }
+      finally { input.disabled = false; }
+    };
+    const originalReplacement = renderRemplacementConfirm;
+    renderRemplacementConfirm = function () {
+      const result = originalReplacement.apply(this, arguments);
+      const input = document.getElementById('remp-date');
+      if (input && remplacementSelected) {
+        input.value = suggestedAttendanceDate(remplacementSelected.jour, getTodayStr());
+        updatePresenceDateWarning();
+      }
+      return result;
+    };
+  }
   function start() {
+    installCourseReportUI();
+    installAttendanceDateUI();
     if (!listening) {
       listening = true;
       window.addEventListener('focus', function () {
@@ -175,6 +412,7 @@
       if (!document.hidden && state.teacher) refresh().catch(function () {});
     }, REFRESH_MS);
     updateBell();
+    updateCourseReportBadge();
   }
   function reset() {
     generation++;
@@ -187,6 +425,8 @@
     selectedKey = null;
     applying.clear();
     locallySaved.clear();
+    locallySavedCourses.clear();
+    updateCourseReportBadge();
     const d = document.getElementById('notifications-dialog');
     if (d && d.open) d.close();
     if (d) d.remove();
@@ -237,15 +477,26 @@
         '{' + C.email + '}=' + formulaString(norm(teacher.email)))),
       getAll(BASE_COURS, TABLE_ABSENCES, query(absFields)),
       teacherCache ? Promise.resolve(teacherCache) :
-        getAll(BASE_COURS, TABLE_TEACHERS, '?fields%5B%5D=Name&fields%5B%5D=Email')
+        getAll(BASE_COURS, TABLE_TEACHERS, '?fields%5B%5D=Name&fields%5B%5D=Email'),
+      getAll(BASE_COURS, TABLE_RAPPORTS,
+        query(['fld5pPY7sfAzWNFJB', 'fldv20CiFCcpI5D0a'], '{Prof}=' + formulaString(teacher.name))),
+      api(BASE_COURS, TABLE_TEACHERS, '/' + teacher.id)
     ]);
     if (!current(capture)) return;
-    const [stored, visible, reports, applications, absences, teachers] = results;
+    const [stored, visible, reports, applications, absences, teachers, courseReports, profile] = results;
+    teacher.classIds = Array.from(new Set(profile.fields['Classes 5786'] || []));
+    const classLinksChanged = JSON.stringify(teacher.classIds) !== JSON.stringify(state.teacher.classIds);
+    if (classLinksChanged) {
+      // Une nouvelle référence invalide aussi un ancien préchargement en cours.
+      state.teacher = Object.assign({}, state.teacher, { classIds: teacher.classIds });
+      invalidateCourseReportClasses();
+    }
     teacherCache = teachers;
-    const classIds = Array.from(new Set(absences.concat(visible).flatMap(function (r) {
+    const classIds = Array.from(new Set((teacher.classIds || []).concat(absences.concat(visible).flatMap(function (r) {
       return r.fields[FLD_ABS_CLASSE] || [];
-    })));
+    }))));
     const info = new Map();
+    const courseClasses = new Map();
     const lieux = await loadLieuxMap();
     for (let i = 0; i < classIds.length; i += 20) {
       if (!current(capture)) return;
@@ -253,7 +504,8 @@
         return 'RECORD_ID()=' + formulaString(id);
       }).join(',') + ')';
       const records = await getAll(BASE_COURS, TABLE_CLASSES, query([
-        FLD_CL_NUM, FLD_CL_CHAPITRE, FLD_CL_JOUR_TEXT, FLD_CL_HORAIRES, FLD_CL_ENDROIT
+        FLD_CL_NUM, FLD_CL_CHAPITRE, FLD_CL_JOUR_TEXT, FLD_CL_HORAIRES, FLD_CL_ENDROIT,
+        FLD_CL_STATUS, FLD_CL_STUDENTS
       ], formula));
       for (const r of records) {
         const f = r.fields;
@@ -262,9 +514,25 @@
           jour: textValue(f[FLD_CL_JOUR_TEXT]), horaires: textValue(f[FLD_CL_HORAIRES]),
           endroit: (f[FLD_CL_ENDROIT] || []).map(function (id) { return lieux[id] || ''; }).filter(Boolean).join(', ')
         });
+        courseClasses.set(r.id, {
+          classId: r.id, num: textValue(f[FLD_CL_NUM]),
+          status: textValue(f[FLD_CL_STATUS]), studentIds: f[FLD_CL_STUDENTS] || []
+        });
       }
     }
     if (!current(capture)) return;
+    const ownClasses = (teacher.classIds || []).map(function (id) { return courseClasses.get(id); }).filter(Boolean);
+    const sentCourseIds = new Set(ownClasses.filter(function (cls) {
+      return locallySavedCourses.has(cls.classId) || courseReportIsSent(cls, courseReports.filter(function (r) {
+        return textValue(r.fields.fld5pPY7sfAzWNFJB).trim() === cls.num.trim();
+      }));
+    }).map(function (cls) { return cls.classId; }));
+    const pendingCourses = ownClasses.filter(function (cls) {
+      return cls.status === 'Complete' && !sentCourseIds.has(cls.classId);
+    });
+    const courseSignature = JSON.stringify(ownClasses.map(function (cls) {
+      return [cls.classId, cls.num, cls.status, cls.studentIds, sentCourseIds.has(cls.classId)];
+    }));
     const now = new Date();
     const today = parisDate(now);
     const openIds = new Set(visible.filter(function (r) {
@@ -328,6 +596,15 @@
         date: dueInstant(f[H.date]), readAt: '', closedAt: ''
       });
     }
+    for (const cls of pendingCourses) {
+      addItem({
+        key: prefix + 'sikkum|' + cls.classId, type: 'sikkum', source: cls.classId,
+        title: 'כיתה ' + cls.num + ' הסתיימה — יש למלא דוח סיום קורס',
+        detail: 'דוח סיום הקורס ממתין למילוי עבור כיתה ' + cls.num,
+        data: { classId: cls.classId, classNum: cls.num },
+        date: now.toISOString(), readAt: '', closedAt: ''
+      });
+    }
     const created = await upsert(TABLE_NOTIFICATIONS, N.key, toCreate, capture);
     if (!current(capture)) return;
     for (const r of created) items.set(r.fields[N.key], fromRecord(r));
@@ -341,6 +618,11 @@
         item.status = offer && offer.assigned ? 'השיעור כבר אויש' :
           !openIds.has(item.source) ? 'ההצעה אינה זמינה עוד' : '';
         closed = !openIds.has(item.source);
+      } else if (item.type === 'sikkum') {
+        const cls = ownClasses.find(function (c) { return c.classId === item.source; });
+        if (sentCourseIds.has(item.source) || locallySavedCourses.has(item.source)) item.status = 'דוח סיום הקורס נשלח';
+        else if (!cls || cls.status !== 'Complete') item.status = 'התזכורת אינה פעילה עוד';
+        closed = !!item.status;
       } else if (item.type === 'presence') {
         if (locallySaved.has(item.source)) item.status = 'הנוכחות הושלמה';
         const report = reports.find(function (r) {
@@ -360,8 +642,8 @@
         item.closedAt = now.toISOString();
         toClose.push({ id: item.id, fields: { [N.closed]: item.closedAt } });
       }
-      if (item.closedAt && !item.status) item.status = item.type === 'presence' ?
-        'התזכורת נסגרה' : 'ההצעה אינה זמינה עוד';
+      if (item.closedAt && !item.status) item.status = item.type === 'remplacement' ?
+        'ההצעה אינה זמינה עוד' : 'התזכורת נסגרה';
     }
     for (let i = 0; i < toClose.length; i += 10) {
       if (!current(capture)) return;
@@ -376,6 +658,7 @@
         item.status = item.status || local.status;
       }
     }
+    const coursesChanged = classLinksChanged || (model.courseSignature && model.courseSignature !== courseSignature);
     model = {
       teacherId: teacher.id, items: Array.from(items.values()).sort(function (a, b) {
         return b.date.localeCompare(a.date);
@@ -384,8 +667,14 @@
       applications: new Set(applications.flatMap(function (r) {
         return (r.fields[C.teacher] || []).includes(teacher.id) ? r.fields[C.absence] || [] : [];
       })),
-      reports: reports, classInfo: info, refreshed: Date.now(), error: '', loaded: true
+      reports: reports, classInfo: info, courseSignature: courseSignature,
+      pendingCourseIds: new Set(pendingCourses.filter(function (cls) {
+        return !locallySavedCourses.has(cls.classId);
+      }).map(function (cls) { return cls.classId; })),
+      refreshed: Date.now(), error: '', loaded: true
     };
+    updateCourseReportBadge();
+    if (coursesChanged) invalidateCourseReportClasses();
     updateBell();
     renderDialog();
     renderProposals();
@@ -510,6 +799,8 @@
       updateBell();
       if (item.type === 'presence' && !item.closedAt) {
         await openAttendance(item, capture);
+      } else if (item.type === 'sikkum') {
+        await openCourseReport(item, capture);
       } else {
         renderDialog();
         await refresh(true); // une ancienne proposition peut être pourvue entre-temps
@@ -519,6 +810,35 @@
         renderDialog();
         showMessage('לא ניתן לפתוח את העדכון כרגע. אפשר לנסות שוב.');
       }
+    }
+  }
+  async function openCourseReport(item, capture) {
+    if (hiddenTabsSet.has('sikkum')) {
+      renderDialog();
+      showMessage('לשונית דוח סיום הקורס אינה זמינה כרגע. יש לפנות להנהלה.');
+      return;
+    }
+    // Relire le statut avant de proposer le bilan, même avec un cache déjà chargé.
+    classesPromise = null;
+    const loaded = await prefetchClasses();
+    if (!current(capture)) return;
+    if (!loaded) throw new Error('Chargement des classes impossible');
+    const cls = completedClasses().find(function (c) { return c.id === item.source; });
+    if (!cls) {
+      await refresh(true);
+      if (current(capture)) showMessage('הכיתה אינה ממתינה כרגע לדוח סיום קורס.');
+      return;
+    }
+    classesLoaded = true;
+    renderSikkumTab();
+    renderPresenceTab();
+    showTabs();
+    activateTabUI('sikkum');
+    close();
+    const block = document.getElementById('block-' + cls.id);
+    if (block) {
+      block.classList.add('open');
+      block.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
   }
   async function openAttendance(item, capture) {
@@ -638,12 +958,39 @@
       if (current(capture)) showMessage('הנוכחות נשמרה. מצב התזכורת יתעדכן בבדיקה הבאה.');
     }
   }
+  async function courseReportSaved(classId) {
+    if (!state.teacher) return;
+    const capture = captureSession();
+    locallySavedCourses.add(classId);
+    model.pendingCourseIds.delete(classId);
+    updateCourseReportBadge();
+    const stamp = new Date().toISOString();
+    const affected = model.items.filter(function (item) {
+      return item.type === 'sikkum' && item.source === classId && !item.closedAt;
+    });
+    for (const item of affected) {
+      item.closedAt = stamp;
+      item.status = 'דוח סיום הקורס נשלח';
+    }
+    updateBell();
+    renderDialog();
+    try {
+      for (const item of affected) {
+        if (!current(capture)) return;
+        if (item.id) await api(BASE_COURS, TABLE_NOTIFICATIONS, '/' + item.id, 'PATCH',
+          { fields: { [N.closed]: stamp } });
+      }
+    } catch (_) {
+      if (current(capture)) showMessage('הדוח נשמר. מצב התזכורת יתעדכן בבדיקה הבאה.');
+    }
+  }
   return {
     headerHtml: headerHtml, start: start, reset: reset, refresh: refresh,
     renderProposals: renderProposals, toggle: toggle, close: close, back: back,
-    apply: apply, presenceSaved: presenceSaved,
+    apply: apply, presenceSaved: presenceSaved, courseReportSaved: courseReportSaved,
     // Fonctions pures exposées pour tester les règles sans accéder aux bases.
-    rules: { parisDate: parisDate, addDays: addDays, dueInstant: dueInstant,
+    rules: { parisDate: parisDate, addDays: addDays, suggestedAttendanceDate: suggestedAttendanceDate,
+      dueInstant: dueInstant,
       reportDue: reportDue, responsibleTeacher: responsibleTeacher, unread: unread,
       html: html, N: N, C: C, H: H, ABS_REPLACEMENT: ABS_REPLACEMENT }
   };
