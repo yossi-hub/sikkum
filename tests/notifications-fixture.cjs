@@ -172,17 +172,61 @@ function fakeDocument() {
   return doc;
 }
 
-function loadApp(backend = makeBackend(), actor = backend.alice, now = NOW) {
+function makeStorage(initial = {}) {
+  const values = new Map(Object.entries(initial));
+  return {
+    getItem(key) { return values.has(key) ? values.get(key) : null; },
+    setItem(key, value) { values.set(key, String(value)); },
+    removeItem(key) { values.delete(key); },
+    snapshot() { return Object.fromEntries(values); }
+  };
+}
+
+function makeTimers() {
+  let elapsed = 0, nextId = 0;
+  const pending = new Map();
+  return {
+    setTimeout(callback, delay = 0) {
+      const id = ++nextId;
+      pending.set(id, { callback, at: elapsed + Number(delay) });
+      return id;
+    },
+    clearTimeout(id) { pending.delete(id); },
+    elapsed() { return elapsed; },
+    async advance(milliseconds) {
+      const target = elapsed + milliseconds;
+      while (true) {
+        const next = [...pending].filter(([, timer]) => timer.at <= target)
+          .sort((a, b) => a[1].at - b[1].at)[0];
+        if (!next) break;
+        elapsed = next[1].at;
+        pending.delete(next[0]);
+        await next[1].callback();
+        // Let chained reads/writes settle even when a timer callback does not
+        // return its asynchronous work.
+        for (let turn = 0; turn < 30; turn++) await Promise.resolve();
+      }
+      elapsed = target;
+      for (let turn = 0; turn < 30; turn++) await Promise.resolve();
+    }
+  };
+}
+
+function loadApp(backend = makeBackend(), actor = backend.alice, now = NOW, options = {}) {
   const NativeDate = Date;
+  const currentTime = () => new NativeDate(now).getTime() + (options.timers?.elapsed?.() || 0);
   class Clock extends NativeDate {
-    constructor(...args) { super(...(args.length ? args : [now])); }
-    static now() { return new NativeDate(now).getTime(); }
+    constructor(...args) { super(...(args.length ? args : [currentTime()])); }
+    static now() { return currentTime(); }
   }
   const document = fakeDocument();
   const sandbox = {
     document, Date: Clock, Intl, URLSearchParams, Set, Map, console: { warn() {} },
-    setInterval() { return 1; }, clearInterval() {}, setTimeout() { return 1; }, clearTimeout() {},
-    addEventListener() {}, scrollTo() {}, localStorage: { getItem() { return null; }, setItem() {}, removeItem() {} },
+    setInterval() { return 1; }, clearInterval() {},
+    setTimeout: options.timers ? options.timers.setTimeout : () => 1,
+    clearTimeout: options.timers ? options.timers.clearTimeout : () => {},
+    addEventListener() {}, scrollTo() {},
+    localStorage: options.storage || { getItem() { return null; }, setItem() {}, removeItem() {} },
     __getAll: backend.getAll, __api: backend.api, __actor: actor
   };
   sandbox.window = sandbox;
@@ -219,7 +263,7 @@ function buildPreview(destination) {
   fs.copyFileSync(path.join(ROOT, 'notifications.js'), path.join(destination, 'notifications.js'));
 }
 
-module.exports = { makeBackend, loadApp, F, NOW, buildPreview };
+module.exports = { makeBackend, loadApp, F, NOW, buildPreview, makeStorage, makeTimers };
 if (require.main === module && process.argv[2] === '--preview') {
   buildPreview(process.argv[3]);
   console.log('Aperçu avec données fictives préparé.');

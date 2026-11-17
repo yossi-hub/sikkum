@@ -155,6 +155,9 @@ input.pres-cours-input { max-width: 110px; direction: ltr; text-align: center; f
 input.pres-cours-input.missing { border-color: #f55700; box-shadow: 0 0 0 2px rgba(245,87,0,0.15); }
 .pres-cours-help { font-size: 12px; color: #2e2e2e; background: rgba(2,93,184,0.06); border-radius: 8px; padding: 8px 10px; line-height: 1.5; }
 .pres-cours-help b { color: #025db8; direction: ltr; unicode-bidi: isolate; }
+.pres-autosave { font-size: 12px; color: #666; line-height: 1.6; }
+.pres-autosave[data-status="saved"] { color: #1d8653; }
+.pres-autosave[data-status="error"], .pres-autosave[data-status="invalid"] { color: #a55b14; }
 .pres-date-warning { font-size: 12px; color: #805310; background: #fff3d6; border: 1px solid #ecd39a; border-radius: 8px; padding: 8px 10px; line-height: 1.6; }
 .pres-students { display: flex; flex-direction: column; }
 .pres-row-wrap { display: flex; align-items: center; gap: 10px; padding: 6px 4px; border-bottom: 0.5px solid rgba(2,93,184,0.07); flex-wrap: wrap; }
@@ -400,6 +403,7 @@ function onPresCoursInput(el) {
   el.classList.remove('missing');
   const errBox = document.getElementById(el.id.replace('pres-chapitre-', 'pres-error-'));
   if (errBox) errBox.innerHTML = '';
+  onPresenceEdited(el.id.replace('pres-chapitre-', ''));
 }
 
 // Champs additionnels de TABLE_CLASSES pour l'onglet "Vos classes"
@@ -506,6 +510,7 @@ let classesLoading = false; // évite de relancer un chargement déjà en cours
 let classesLoaded = false;  // vrai une fois les classes chargées avec succès
 let classesPromise = null;  // chargement des classes en cours (préchargement)
 let state = { teacher: null, classes: [], students: {}, presences: {}, rapportRecords: {}, presenceRecordsToday: {}, presenceCache: {}, presenceMeta: {}, presenceHistory: {}, annuaire: [], mesclasses: [], absenceClasses: [] };
+const presenceHistoryRequests = new Map();
 
 // ── API ──
 // Airtable limite à 5 requêtes / seconde par base : on espace les départs
@@ -650,6 +655,7 @@ function renderHeaderUser(teacher) {
       <button class="btn-logout" onclick="logout()">התנתקות</button>
     </div>`;
   LaviNotifications.start();
+  resumePresenceDrafts();
 }
 
 function renderHeaderDefault() {
@@ -660,6 +666,8 @@ function renderHeaderDefault() {
 // ── INIT ──
 function resetTeacherState() {
   sessionId++;          // invalide tout chargement encore en cours
+  resetPresenceAutosave();
+  presenceHistoryRequests.clear();
   LaviNotifications.reset();
   classesLoading = false;
   classesPromise = null;
@@ -1612,7 +1620,11 @@ async function loadPresenceHistory(classId, force) {
   if (!cls) return;
   const cached = state.presenceHistory[classId];
   if (cached && !force) { renderPresenceHistory(classId); return; }
-  if (cached === 'loading') return;
+  if (cached === 'loading' && !force) return;
+  const mySession = sessionId;
+  const request = {};
+  presenceHistoryRequests.set(classId, request);
+  const current = () => mySession === sessionId && presenceHistoryRequests.get(classId) === request;
   state.presenceHistory[classId] = 'loading';
   const el = document.getElementById(`pres-hist-${classId}`);
   if (el) el.innerHTML = `<div class="pres-hist-empty">⏳ טוען היסטוריית שיעורים...</div>`;
@@ -1621,6 +1633,7 @@ async function loadPresenceHistory(classId, force) {
     const fields = [FLD_PRES_ELEVE, FLD_PRES_DATE, FLD_PRES_PRESENT, FLD_PRES_PROF, FLD_PRES_CHAPITRE, FLD_PRES_LECON, FLD_PRES_MOTIF]
       .map(f => `&fields%5B%5D=${f}`).join('');
     const recs = await getAll(BASE_COURS, TABLE_PRESENCES_JOUR, `?filterByFormula=${formula}&returnFieldsByFieldId=true${fields}`);
+    if (!current()) return;
     // Regrouper par jour de séance
     const byDate = {};
     for (const r of recs) {
@@ -1641,8 +1654,10 @@ async function loadPresenceHistory(classId, force) {
     const missing = [...new Set(Object.values(byDate).flatMap(s => s.students.map(x => x.sid)))].filter(id => !state.students[id]);
     try { await fetchStudentNames(missing, state.students); }
     catch (e) { /* noms manquants : on affichera "?" */ }
+    if (!current()) return;
     state.presenceHistory[classId] = Object.values(byDate).sort((a, b) => b.date.localeCompare(a.date)); // tri côté client
   } catch (e) {
+    if (!current()) return;
     delete state.presenceHistory[classId];
     if (el) el.innerHTML = `<div class="pres-hist-empty">⚠️ לא ניתן לטעון את ההיסטוריה</div>`;
     return;
@@ -1815,7 +1830,7 @@ function buildStudentChecklist(cls, existingMap) {
     html += `
       <div class="pres-row-wrap">
         <label class="pres-row"><input type="checkbox" class="pres-check" id="pc-${cls.id}-${sid}" onchange="toggleMotifField('${cls.id}','${sid}')" ${checked ? 'checked' : ''} /> ${studentNameHtml(sid, name)}</label>
-        <input type="text" class="field-input pres-motif" id="pm-${cls.id}-${sid}" placeholder="סיבת היעדרות" value="${motif}" style="display:${checked ? 'none' : 'inline-block'};" />
+        <input type="text" class="field-input pres-motif" id="pm-${cls.id}-${sid}" placeholder="סיבת היעדרות" value="${escHtml(motif)}" oninput="onPresenceEdited('${cls.id}')" style="display:${checked ? 'none' : 'inline-block'};" />
       </div>`;
   }
   html += '</div>';
@@ -1826,9 +1841,11 @@ function toggleMotifField(classId, sid) {
   const checkEl = document.getElementById(`pc-${classId}-${sid}`);
   const motifEl = document.getElementById(`pm-${classId}-${sid}`);
   if (checkEl && motifEl) motifEl.style.display = checkEl.checked ? 'none' : 'inline-block';
+  onPresenceEdited(classId);
 }
 
 function renderPresenceTab() {
+  resumePresenceDrafts();
   setTab('presence', buildPresenceHtml());
   // L'historique d'une classe se charge quand on l'ouvre (togglePresenceClass)
 }
@@ -1881,7 +1898,7 @@ function buildPresenceHtml() {
             </div>
             <div class="field-group infos-full">
               <label class="field-label">מס' שיעור ושקופית במצגת</label>
-              <input type="text" class="field-input" id="pres-lecon-${cls.id}" value="${escHtml(meta.lecon)}" placeholder="לדוגמה: שיעור 5, שקופית 12" />
+              <input type="text" class="field-input" id="pres-lecon-${cls.id}" value="${escHtml(meta.lecon)}" placeholder="לדוגמה: שיעור 5, שקופית 12" oninput="onPresenceEdited('${cls.id}')" />
             </div>
           </div>
         </div>
@@ -1891,7 +1908,7 @@ function buildPresenceHtml() {
         </div>
         <div class="class-submit-area">
           <div class="submit-class-note">ניתן לתקן תאריך קודם על ידי שינוי השדה למעלה</div>
-          <button class="btn-submit-class" id="pres-btn-${cls.id}" onclick="submitPresence('${cls.id}')">💾 שמירת נוכחות</button>
+          <div class="pres-autosave" id="pres-autosave-${cls.id}" role="status" aria-live="polite">השינויים נשמרים אוטומטית לאחר 10 דקות ללא שינוי</div>
         </div>
       </div>
     </div>`;
@@ -1982,19 +1999,21 @@ async function loadAndRenderPresenceChecklist(classId, dateStr) {
   const leconEl = document.getElementById(`pres-lecon-${classId}`);
   if (leconEl) leconEl.value = meta.lecon || '';
 
-  state.presenceCache[classId] = { dateStr, existingMap };
+  state.presenceCache[classId] = { dateStr, existingMap, loaded: true };
   if (listEl) listEl.innerHTML = buildStudentChecklist(cls, existingMap);
   const badge = document.getElementById(`pres-status-${classId}`);
   const anyDone = Object.keys(existingMap).length > 0;
   if (badge) badge.style.display = anyDone ? 'inline-block' : 'none';
+  restorePresenceDraft(cls, dateStr);
   renderPresenceHistory(classId); // "séance précédente" relative à la date choisie
 }
 
 // Met à jour "Chapitre en cours" (table Classes) avec le פרק.שיעור de la séance LA PLUS RÉCENTE.
 // On ne prend pas simplement la dernière saisie : si un prof remplit après coup une séance
 // passée, cela ne doit pas faire reculer le chapitre de la classe.
-async function syncChapitreEnCours(cls, savedDate, savedChapitre) {
+async function syncChapitreEnCours(cls, savedDate, savedChapitre, savedSession = sessionId) {
   try {
+    if (!cls || savedSession !== sessionId) return;
     const hist = state.presenceHistory[cls.id];
     let code = '';
     if (Array.isArray(hist)) {
@@ -2006,6 +2025,7 @@ async function syncChapitreEnCours(cls, savedDate, savedChapitre) {
     }
     if (!code || code === cls.chapitre) return; // rien à changer
     await api(BASE_COURS, TABLE_CLASSES, `/${cls.id}`, 'PATCH', { fields: { [FLD_CL_CHAPITRE]: code } });
+    if (savedSession !== sessionId) return;
     cls.chapitre = code;
     const mc = (state.mesclasses || []).find(c => c.id === cls.id);
     if (mc) mc.chapitre = code;
@@ -2014,85 +2034,256 @@ async function syncChapitreEnCours(cls, savedDate, savedChapitre) {
   }
 }
 
-async function submitPresence(classId) {
-  const cls = state.classes.find(c => c.id === classId);
-  if (!cls) return;
-  const dateStr = document.getElementById(`pres-date-${classId}`)?.value || getTodayStr();
-  const cache = state.presenceCache[classId] || { existingMap: {} };
-  const existingMap = cache.existingMap || {};
-  const btn = document.getElementById(`pres-btn-${classId}`);
-  const errBox = document.getElementById(`pres-error-${classId}`);
-  if (errBox) errBox.innerHTML = '';
+// Saisie locale immédiate ; seule la synchronisation Airtable est temporisée.
+const PRESENCE_SAVE_DELAY = 10 * 60 * 1000;
+const PRESENCE_RETRY_DELAY = 30000;
+const presenceAutosaves = new Map();
+let presenceSaveVersion = 0;
+let presenceDraftTeacher = null;
 
-  // "chapitre.cours" obligatoire, format libre (ex. 0.1, 1.3, 9.2, 12.15)
-  const chapitreEl = document.getElementById(`pres-chapitre-${classId}`);
-  const chapitreRaw = chapitreEl?.value || '';
-  const chapitreVal = normalizeCours(chapitreRaw);
-  if (!chapitreVal) {
-    chapitreEl?.classList.add('missing');
-    if (errBox) errBox.innerHTML = `<div class="error-msg">${coursErrorMsg(chapitreRaw)}</div>`;
-    chapitreEl?.focus();
-    return;
-  }
-  if (chapitreEl) chapitreEl.value = chapitreVal; // affiche la version normalisée (ex. "1,3" → "1.3")
-  const leconVal = document.getElementById(`pres-lecon-${classId}`)?.value || '';
-
-  if (btn) { btn.disabled = true; btn.textContent = 'שומר...'; }
-  const isoDate = `${dateStr}T12:00:00.000Z`;
-  const toCreate = [], toUpdate = [];
-  for (const sid of cls.studentIds) {
-    const checkEl = document.getElementById(`pc-${classId}-${sid}`);
-    if (!checkEl) continue;
-    const motifEl = document.getElementById(`pm-${classId}-${sid}`);
-    const motifVal = checkEl.checked ? '' : (motifEl?.value || '');
-    const fields = {
-      [FLD_PRES_ELEVE]: [sid],
-      [FLD_PRES_CLASSE]: cls.num,
-      [FLD_PRES_DATE]: isoDate,
-      [FLD_PRES_PRESENT]: checkEl.checked,
-      [FLD_PRES_PROF]: state.teacher.name,
-      [FLD_PRES_MOTIF]: motifVal,
-      [FLD_PRES_CHAPITRE]: chapitreVal,
-      [FLD_PRES_LECON]: leconVal
-    };
-    const existing = existingMap[sid];
-    if (existing) toUpdate.push({ id: existing.recordId, fields });
-    else toCreate.push({ fields });
-  }
-
+function presenceStorageKey() {
+  return 'lavi_presence_drafts_v1:' + state.teacher.id;
+}
+function presenceDraftKey(classId, dateStr) {
+  return JSON.stringify([state.teacher.id, classId, dateStr]);
+}
+function currentPresenceDraft(entry) {
+  return entry.session === sessionId && state.teacher?.id === entry.draft.teacherId &&
+    presenceAutosaves.get(entry.key) === entry;
+}
+function resetPresenceAutosave() {
+  for (const entry of presenceAutosaves.values()) clearTimeout(entry.timer);
+  presenceAutosaves.clear();
+  presenceDraftTeacher = null;
+}
+function persistPresenceDrafts() {
+  if (!state.teacher) return;
+  const entries = [...presenceAutosaves.values()].filter(e => currentPresenceDraft(e) && e.dirty);
   try {
-    for (let i = 0; i < toUpdate.length; i += 10) {
-      await api(BASE_COURS, TABLE_PRESENCES_JOUR, '', 'PATCH', { records: toUpdate.slice(i, i + 10) });
-    }
-    for (let i = 0; i < toCreate.length; i += 10) {
-      await api(BASE_COURS, TABLE_PRESENCES_JOUR, '', 'POST', { records: toCreate.slice(i, i + 10) });
-    }
-    // Oublier la copie locale du jour pour relire les présences réelles depuis Airtable
-    // (sinon, après un 2e enregistrement, les cases réaffichaient l'ancien état)
-    delete state.presenceRecordsToday[classId];
-    await loadAndRenderPresenceChecklist(classId, dateStr);
-    // rafraîchir l'historique avec la séance enregistrée, puis recopier le פרק.שיעור
-    // de la séance la plus récente dans "Chapitre en cours" de la classe
-    loadPresenceHistory(classId, true).then(() => syncChapitreEnCours(cls, dateStr, chapitreVal));
-    LaviNotifications.presenceSaved(cls.num, dateStr);
-    if (dateStr === getTodayStr()) {
-      state.presenceRecordsToday[classId] = state.presenceCache[classId].existingMap;
-      state.presenceMeta[classId] = { chapitre: chapitreVal != null ? chapitreVal : '', lecon: leconVal };
-      const block = document.getElementById(`presblock-${classId}`);
-      if (block) block.classList.add('sent');
-    }
-    if (btn) {
-      btn.disabled = false;
-      btn.textContent = '✓ נשמר';
-      btn.classList.add('done');
-      setTimeout(() => { btn.textContent = '💾 שמירת נוכחות'; btn.classList.remove('done'); }, 1500);
-    }
-  } catch (e) {
-    if (btn) { btn.disabled = false; btn.textContent = '💾 שמירת נוכחות'; }
-    const errEl = document.getElementById(`pres-error-${classId}`);
-    if (errEl) errEl.innerHTML = `<div class="error-msg">Erreur : ${e.message}</div>`;
+    if (entries.length) localStorage.setItem(presenceStorageKey(), JSON.stringify(entries.map(e => e.draft)));
+    else localStorage.removeItem(presenceStorageKey());
+    for (const entry of entries) entry.persisted = true;
+  } catch (_) {
+    for (const entry of entries) entry.persisted = false;
   }
 }
+function resumePresenceDrafts() {
+  if (!state.teacher || presenceDraftTeacher === state.teacher.id) return;
+  resetPresenceAutosave();
+  presenceDraftTeacher = state.teacher.id;
+  try {
+    const drafts = JSON.parse(localStorage.getItem(presenceStorageKey()) || '[]');
+    if (!Array.isArray(drafts)) return;
+    for (const draft of drafts) {
+      if (!draft || draft.teacherId !== state.teacher.id || typeof draft.classId !== 'string' ||
+          typeof draft.classNum !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(draft.dateStr) ||
+          !Array.isArray(draft.students) || !draft.students.every(s => s && typeof s.sid === 'string')) continue;
+      const key = presenceDraftKey(draft.classId, draft.dateStr);
+      const entry = { key, draft, revision: 1, dirty: true, session: sessionId, persisted: true, status: 'pending' };
+      presenceAutosaves.set(key, entry);
+      schedulePresenceDraft(entry, remainingPresenceDelay(entry));
+    }
+  } catch (_) { /* Un stockage bloqué ne doit pas empêcher la saisie. */ }
+}
+function presenceDraftDate(classId, fallback) {
+  let latest;
+  for (const entry of presenceAutosaves.values()) {
+    if (entry.dirty && entry.draft.classId === classId && !entry.draft.replacement &&
+        (!latest || entry.draft.updatedAt >= latest.draft.updatedAt)) latest = entry;
+  }
+  return latest ? latest.draft.dateStr : fallback;
+}
+function updatePresenceAutosaveStatus(entry) {
+  if (!currentPresenceDraft(entry)) return;
+  const draft = entry.draft;
+  const local = entry.persisted ? 'השינויים נשמרו במכשיר.' : 'השינויים ממתינים בזיכרון. יש להשאיר את הדף פתוח.';
+  const messages = {
+    pending: local + ' סנכרון אוטומטי בעוד 10 דקות ללא שינוי.',
+    saving: local + ' מסנכרן…',
+    saved: '✓ הנוכחות נשמרה בהצלחה',
+    invalid: local + ' להשלמת הסנכרון יש למלא פרק ושיעור בפורמט 1.3.',
+    error: local + ' הסנכרון נכשל. ניסיון נוסף יתבצע אוטומטית.'
+  };
+  const targets = [];
+  const cache = state.presenceCache[draft.classId];
+  if (cache?.dateStr === draft.dateStr && document.getElementById(`pres-date-${draft.classId}`)?.value === draft.dateStr) {
+    targets.push(document.getElementById(`pres-autosave-${draft.classId}`));
+  }
+  if (remplacementSelected?.id === draft.classId && remplacementSelected._dateStr === draft.dateStr) {
+    targets.push(document.getElementById('remp-autosave'));
+  }
+  for (const el of targets) {
+    if (el) { el.textContent = messages[entry.status]; el.dataset.status = entry.status; }
+  }
+}
+function schedulePresenceDraft(entry, delay = PRESENCE_SAVE_DELAY) {
+  clearTimeout(entry.timer);
+  if (!entry.dirty || !currentPresenceDraft(entry)) return;
+  entry.status = normalizeCours(entry.draft.chapitre) ? 'pending' : 'invalid';
+  updatePresenceAutosaveStatus(entry);
+  if (entry.status === 'invalid') return;
+  entry.timer = setTimeout(() => { flushPresenceDraft(entry); }, delay);
+}
+function remainingPresenceDelay(entry) {
+  const editedAt = Number(entry.draft.updatedAt);
+  return Number.isFinite(editedAt) ? Math.max(0, Math.min(PRESENCE_SAVE_DELAY, editedAt + PRESENCE_SAVE_DELAY - Date.now())) : PRESENCE_SAVE_DELAY;
+}
+function capturePresenceDraft(cls, dateStr, replacement) {
+  if (!state.teacher) return;
+  resumePresenceDrafts();
+  const chapter = document.getElementById(replacement ? 'remp-chapitre' : `pres-chapitre-${cls.id}`);
+  const lesson = document.getElementById(replacement ? 'remp-lecon' : `pres-lecon-${cls.id}`);
+  if (!chapter || chapter.disabled) return;
+  const students = [];
+  for (const sid of cls.studentIds) {
+    const check = document.getElementById(replacement ? `rc-${sid}` : `pc-${cls.id}-${sid}`);
+    if (!check) return; // Ne jamais envoyer une liste encore en chargement.
+    const student = { sid, present: !!check.checked };
+    if (!replacement) student.motif = check.checked ? '' : (document.getElementById(`pm-${cls.id}-${sid}`)?.value || '');
+    students.push(student);
+  }
+  const draft = { teacherId: state.teacher.id, teacherName: state.teacher.name,
+    classId: cls.id, classNum: String(cls.num), dateStr, replacement: !!replacement,
+    chapitre: chapter.value, lecon: lesson?.value || '', students, updatedAt: Date.now() };
+  const key = presenceDraftKey(cls.id, dateStr);
+  let entry = presenceAutosaves.get(key);
+  if (!entry) {
+    entry = { key, revision: 0, session: sessionId };
+    presenceAutosaves.set(key, entry);
+  }
+  entry.draft = draft;
+  entry.revision++;
+  entry.dirty = true;
+  persistPresenceDrafts();
+  schedulePresenceDraft(entry);
+  return entry;
+}
+function onPresenceEdited(classId) {
+  const cls = state.classes.find(c => c.id === classId);
+  const cache = state.presenceCache[classId];
+  const date = document.getElementById(`pres-date-${classId}`);
+  if (!cls || !cache?.loaded || cache.loading || !date || date.value !== cache.dateStr) return;
+  return capturePresenceDraft(cls, cache.dateStr, false);
+}
+function onReplacementPresenceEdited() {
+  const cls = remplacementSelected;
+  if (cls?._dateStr) return capturePresenceDraft(cls, cls._dateStr, true);
+}
+function restorePresenceDraft(cls, dateStr, replacement = false, loadedVersion = presenceSaveVersion) {
+  if (!state.teacher) return;
+  const entry = presenceAutosaves.get(presenceDraftKey(cls.id, dateStr));
+  if (!entry) return;
+  if (!entry.dirty && !(entry.savedVersion > loadedVersion)) { updatePresenceAutosaveStatus(entry); return; }
+  const draft = entry.draft;
+  const chapter = document.getElementById(replacement ? 'remp-chapitre' : `pres-chapitre-${cls.id}`);
+  const lesson = document.getElementById(replacement ? 'remp-lecon' : `pres-lecon-${cls.id}`);
+  if (chapter) chapter.value = draft.chapitre;
+  if (lesson) lesson.value = draft.lecon;
+  for (const student of draft.students) {
+    const check = document.getElementById(replacement ? `rc-${student.sid}` : `pc-${cls.id}-${student.sid}`);
+    const motif = !replacement && document.getElementById(`pm-${cls.id}-${student.sid}`);
+    if (check) check.checked = student.present;
+    if (motif) { motif.value = student.motif || ''; motif.style.display = student.present ? 'none' : 'inline-block'; }
+  }
+  updatePresenceAutosaveStatus(entry);
+}
+async function flushPresenceDraft(entry) {
+  clearTimeout(entry.timer);
+  if (!currentPresenceDraft(entry) || !entry.dirty) return false;
+  if (entry.inFlight) return entry.inFlight;
+  const draft = JSON.parse(JSON.stringify(entry.draft));
+  const chapter = normalizeCours(draft.chapitre);
+  if (!chapter) { entry.status = 'invalid'; updatePresenceAutosaveStatus(entry); return false; }
+  const revision = entry.revision;
+  entry.status = 'saving';
+  updatePresenceAutosaveStatus(entry);
+  entry.inFlight = (async () => {
+    let retry = false;
+    try {
+      // Relire avant chaque tentative : un POST a pu réussir malgré une réponse perdue.
+      const formula = encodeURIComponent(`AND({Classes}="${draft.classNum.replace(/"/g, '\\"')}",IS_SAME({Date},"${draft.dateStr}",'day'))`);
+      const records = await getAll(BASE_COURS, TABLE_PRESENCES_JOUR, `?filterByFormula=${formula}&returnFieldsByFieldId=true`);
+      if (!currentPresenceDraft(entry)) return false;
+      const existingMap = {};
+      for (const record of records) {
+        const sid = (record.fields[FLD_PRES_ELEVE] || [])[0];
+        if (sid) existingMap[sid] = { recordId: record.id };
+      }
+      const creates = [], updates = [];
+      for (const student of draft.students) {
+        const fields = { [FLD_PRES_ELEVE]: [student.sid], [FLD_PRES_CLASSE]: draft.classNum,
+          [FLD_PRES_DATE]: draft.dateStr + 'T12:00:00.000Z', [FLD_PRES_PRESENT]: student.present,
+          [FLD_PRES_PROF]: draft.teacherName, [FLD_PRES_CHAPITRE]: chapter, [FLD_PRES_LECON]: draft.lecon };
+        if (student.motif !== undefined) fields[FLD_PRES_MOTIF] = student.motif;
+        const old = existingMap[student.sid];
+        if (old) updates.push({ id: old.recordId, fields });
+        else creates.push({ fields });
+      }
+      for (const [method, rows] of [['PATCH', updates], ['POST', creates]]) {
+        for (let i = 0; i < rows.length; i += 10) {
+          if (!currentPresenceDraft(entry)) return false;
+          const result = await api(BASE_COURS, TABLE_PRESENCES_JOUR, '', method, { records: rows.slice(i, i + 10) });
+          if (!currentPresenceDraft(entry)) return false;
+          for (const record of result.records || []) {
+            const sid = (record.fields[FLD_PRES_ELEVE] || [])[0];
+            if (sid) existingMap[sid] = { recordId: record.id, present: !!record.fields[FLD_PRES_PRESENT], motif: record.fields[FLD_PRES_MOTIF] || '' };
+          }
+        }
+      }
+      if (!currentPresenceDraft(entry)) return false;
+      if (entry.revision === revision) entry.dirty = false;
+      entry.savedVersion = ++presenceSaveVersion;
+      entry.status = entry.dirty ? 'pending' : 'saved';
+      persistPresenceDrafts();
+      const cache = state.presenceCache[draft.classId];
+      if (cache?.dateStr === draft.dateStr) cache.existingMap = existingMap;
+      if (draft.dateStr === getTodayStr()) state.presenceRecordsToday[draft.classId] = existingMap;
+      if (cache?.dateStr === draft.dateStr && document.getElementById(`pres-date-${draft.classId}`)?.value === draft.dateStr) {
+        const badge = document.getElementById(`pres-status-${draft.classId}`);
+        if (badge) { badge.style.display = 'inline-block'; badge.textContent = draft.dateStr === getTodayStr() ? '✓ נרשם היום' : '✓ נרשם לתאריך זה'; }
+        document.getElementById(`presblock-${draft.classId}`)?.classList.add('sent');
+      }
+      updatePresenceAutosaveStatus(entry);
+      LaviNotifications.presenceSaved(draft.classNum, draft.dateStr).catch(() => {});
+      // Rafraîchir les données secondaires sans reconstituer le formulaire en cours de saisie.
+      const savedSession = sessionId;
+      if (state.classes.some(c => c.id === draft.classId)) {
+        loadPresenceHistory(draft.classId, true).then(() => {
+          if (savedSession === sessionId) return syncChapitreEnCours(state.classes.find(c => c.id === draft.classId), draft.dateStr, chapter, savedSession);
+        });
+      } else {
+        syncChapitreEnCoursRemplacement(draft.classId, draft.classNum, savedSession);
+      }
+      return true;
+    } catch (_) {
+      if (currentPresenceDraft(entry)) {
+        entry.status = 'error';
+        retry = true;
+        updatePresenceAutosaveStatus(entry);
+      }
+      return false;
+    } finally {
+      entry.inFlight = null;
+      if (currentPresenceDraft(entry) && entry.dirty) {
+        if (entry.revision !== revision) schedulePresenceDraft(entry, remainingPresenceDelay(entry));
+        else if (retry) {
+          entry.timer = setTimeout(() => { flushPresenceDraft(entry); }, PRESENCE_RETRY_DELAY);
+        }
+      }
+    }
+  })();
+  return entry.inFlight;
+}
+async function submitPresence(classId) {
+  const entry = onPresenceEdited(classId);
+  if (entry) return flushPresenceDraft(entry);
+  return false;
+}
+window.addEventListener('online', () => {
+  for (const entry of presenceAutosaves.values()) {
+    if (entry.dirty) schedulePresenceDraft(entry, remainingPresenceDelay(entry));
+  }
+});
 
 // ── Remplacement d'un autre prof ──
 async function loadAllClassesLight() {
@@ -2208,10 +2399,19 @@ async function confirmRemplacement(selectedDate) {
   const dateStr = selectedDate || document.getElementById('remp-date')?.value || getTodayStr();
   const r = remplacementSelected;
   if (!r) return;
+  resumePresenceDrafts();
+  const mySession = sessionId;
+  const loadedVersion = presenceSaveVersion;
+  const container = document.getElementById('remp-results');
+  const request = {};
+  r._request = request;
+  const selected = () => mySession === sessionId && remplacementSelected === r &&
+    r._request === request && document.getElementById('remp-results') === container;
   document.getElementById('remp-results').innerHTML = `<div class="loading" style="padding:0.5rem;"><div class="spinner"></div></div>`;
   try {
     const formula = encodeURIComponent(`AND({Classes}="${String(r.num).replace(/"/g,'\\"')}",IS_SAME({Date},"${dateStr}",'day'))`);
     const recs = await getAll(BASE_COURS, TABLE_PRESENCES_JOUR, `?filterByFormula=${formula}&returnFieldsByFieldId=true`);
+    if (!selected()) return;
     const existingMap = {};
     for (const rec of recs) {
       const sid = (rec.fields[FLD_PRES_ELEVE] || [])[0];
@@ -2228,7 +2428,7 @@ async function confirmRemplacement(selectedDate) {
       const name = state.students[sid] || sid;
       const rec = existingMap[sid];
       const checked = rec ? rec.present : false;
-      return `<label class="pres-row"><input type="checkbox" class="pres-check" id="rc-${sid}" ${checked ? 'checked' : ''} /> ${studentNameHtml(sid, name)}</label>`;
+      return `<label class="pres-row"><input type="checkbox" class="pres-check" id="rc-${sid}" onchange="onReplacementPresenceEdited()" ${checked ? 'checked' : ''} /> ${studentNameHtml(sid, name)}</label>`;
     }).join('');
     document.getElementById('remp-results').innerHTML = `
       <div class="card" style="border-color:#f55700;">
@@ -2237,37 +2437,41 @@ async function confirmRemplacement(selectedDate) {
         <div class="infos-grid" style="margin-bottom:12px;">
           <div class="field-group" style="max-width:160px;">
             <label class="field-label">פרק.שיעור *</label>
-            <input type="text" inputmode="decimal" autocomplete="off" class="field-input pres-cours-input" id="remp-chapitre" value="${escHtml(meta.chapitre)}" placeholder="1.3" oninput="this.classList.remove('missing'); const e = document.getElementById('remp-submit-error'); if (e) e.innerHTML = '';" />
+            <input type="text" inputmode="decimal" autocomplete="off" class="field-input pres-cours-input" id="remp-chapitre" value="${escHtml(meta.chapitre)}" placeholder="1.3" oninput="this.classList.remove('missing'); onReplacementPresenceEdited();" />
           </div>
           <div class="field-group infos-full">
             <div class="pres-cours-help">✏️ יש לרשום את מספר הפרק ואת מספר השיעור, מופרדים בנקודה. לדוגמה: <b>1.3</b> = פרק 1, שיעור 3 · <b>8.7</b> = פרק 8, שיעור 7</div>
           </div>
           <div class="field-group infos-full">
             <label class="field-label">מס' שיעור ושקופית במצגת</label>
-            <input type="text" class="field-input" id="remp-lecon" value="${escHtml(meta.lecon)}" placeholder="לדוגמה: שיעור 5, שקופית 12" />
+            <input type="text" class="field-input" id="remp-lecon" value="${escHtml(meta.lecon)}" placeholder="לדוגמה: שיעור 5, שקופית 12" oninput="onReplacementPresenceEdited()" />
           </div>
         </div>
         <div class="pres-students">${listHtml}</div>
         <div id="remp-submit-error"></div>
         <div style="margin-top:12px;display:flex;gap:10px;">
-          <button class="btn-submit-class" id="remp-submit-btn" onclick="submitRemplacementPresence('${dateStr}')">💾 שמירת נוכחות</button>
-          <button class="btn-ghost" onclick="cancelRemplacement()">ביטול</button>
+          <div class="pres-autosave" id="remp-autosave" role="status" aria-live="polite">השינויים נשמרים אוטומטית לאחר 10 דקות ללא שינוי</div>
+          <button class="btn-ghost" onclick="cancelRemplacement()">סגירה</button>
         </div>
       </div>`;
     remplacementSelected._existingMap = existingMap;
     remplacementSelected._sortedIds = sortedIds;
+    remplacementSelected._dateStr = dateStr;
+    restorePresenceDraft(r, dateStr, true, loadedVersion);
   } catch (e) {
+    if (!selected()) return;
     document.getElementById('remp-results').innerHTML = `<div class="error-msg">Erreur : ${e.message}</div>`;
   }
 }
 
 // Après un remplacement : recopie dans "Chapitre en cours" le פרק.שיעור de la séance
 // LA PLUS RÉCENTE de la classe (même règle que syncChapitreEnCours : pas de recul).
-async function syncChapitreEnCoursRemplacement(classId, classNum) {
+async function syncChapitreEnCoursRemplacement(classId, classNum, savedSession = sessionId) {
   try {
     const formula = encodeURIComponent(`{Classes}="${String(classNum).replace(/"/g,'\\"')}"`);
     const fields = [FLD_PRES_DATE, FLD_PRES_CHAPITRE].map(f => `&fields%5B%5D=${f}`).join('');
     const recs = await getAll(BASE_COURS, TABLE_PRESENCES_JOUR, `?filterByFormula=${formula}&returnFieldsByFieldId=true${fields}`);
+    if (savedSession !== sessionId) return;
     let bestDate = '', code = '';
     for (const rec of recs) {
       const d = String(rec.fields[FLD_PRES_DATE] || '').slice(0, 10);
@@ -2276,6 +2480,7 @@ async function syncChapitreEnCoursRemplacement(classId, classNum) {
     }
     if (!code) return;
     await api(BASE_COURS, TABLE_CLASSES, `/${classId}`, 'PATCH', { fields: { [FLD_CL_CHAPITRE]: code } });
+    if (savedSession !== sessionId) return;
     // si c'est aussi une classe affichée dans l'app, garder l'affichage à jour
     const own = (state.classes || []).find(c => c.id === classId);
     if (own) { own.chapitre = code; delete state.presenceHistory[classId]; }
@@ -2287,64 +2492,10 @@ async function syncChapitreEnCoursRemplacement(classId, classNum) {
 }
 
 async function submitRemplacementPresence(dateStr) {
-  const r = remplacementSelected;
-  if (!r) return;
-  const btn = document.getElementById('remp-submit-btn');
-  const errBox = document.getElementById('remp-submit-error');
-  if (errBox) errBox.innerHTML = '';
-
-  // "chapitre.cours" obligatoire, comme pour ses propres classes
-  const chapitreEl = document.getElementById('remp-chapitre');
-  const chapitreRaw = chapitreEl?.value || '';
-  const chapitreVal = normalizeCours(chapitreRaw);
-  if (!chapitreVal) {
-    chapitreEl?.classList.add('missing');
-    if (errBox) errBox.innerHTML = `<div class="error-msg">${coursErrorMsg(chapitreRaw)}</div>`;
-    chapitreEl?.focus();
-    return;
-  }
-  if (chapitreEl) chapitreEl.value = chapitreVal;
-  const leconVal = document.getElementById('remp-lecon')?.value || '';
-
-  if (btn) { btn.disabled = true; btn.textContent = 'שומר...'; }
-  const isoDate = `${dateStr}T12:00:00.000Z`;
-  const toCreate = [], toUpdate = [];
-  for (const sid of r._sortedIds) {
-    const el = document.getElementById(`rc-${sid}`);
-    if (!el) continue;
-    const fields = {
-      [FLD_PRES_ELEVE]: [sid],
-      [FLD_PRES_CLASSE]: r.num,
-      [FLD_PRES_DATE]: isoDate,
-      [FLD_PRES_PRESENT]: el.checked,
-      [FLD_PRES_PROF]: state.teacher.name,
-      [FLD_PRES_CHAPITRE]: chapitreVal,
-      [FLD_PRES_LECON]: leconVal
-    };
-    const existing = r._existingMap[sid];
-    if (existing) toUpdate.push({ id: existing.recordId, fields });
-    else toCreate.push({ fields });
-  }
-  try {
-    for (let i = 0; i < toUpdate.length; i += 10) {
-      await api(BASE_COURS, TABLE_PRESENCES_JOUR, '', 'PATCH', { records: toUpdate.slice(i, i + 10) });
-    }
-    for (let i = 0; i < toCreate.length; i += 10) {
-      await api(BASE_COURS, TABLE_PRESENCES_JOUR, '', 'POST', { records: toCreate.slice(i, i + 10) });
-    }
-    LaviNotifications.presenceSaved(r.num, dateStr);
-    syncChapitreEnCoursRemplacement(r.id, r.num); // en arrière-plan, ne bloque pas
-    document.getElementById('remp-results').innerHTML = `
-      <div class="success-screen" style="padding:1.5rem;">
-        <div class="success-icon">✅</div>
-        <h2 style="font-size:16px;">הנוכחות נשמרה</h2>
-      </div>`;
-    setTimeout(() => { cancelRemplacement(); }, 1800);
-  } catch (e) {
-    if (btn) { btn.disabled = false; btn.textContent = '💾 שמירת נוכחות'; }
-    const errEl = document.getElementById('remp-submit-error');
-    if (errEl) errEl.innerHTML = `<div class="error-msg">Erreur : ${e.message}</div>`;
-  }
+  if (remplacementSelected?._dateStr !== dateStr) return false;
+  const entry = onReplacementPresenceEdited();
+  if (entry) return flushPresenceDraft(entry);
+  return false;
 }
 
 // ── ONGLET 4 : ANNUAIRE ──
