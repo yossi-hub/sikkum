@@ -1596,7 +1596,7 @@ function togglePresenceClass(classId) {
   if (block.classList.contains('open')) loadPresenceHistory(classId);
 }
 
-// ── Historique des séances précédentes (chargé à l'ouverture de la classe) ──
+// ── Historique des séances enregistrées (chargé à l'ouverture de la classe) ──
 function escHtml(s) {
   return String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]));
 }
@@ -1625,9 +1625,10 @@ async function loadPresenceHistory(classId, force) {
   const request = {};
   presenceHistoryRequests.set(classId, request);
   const current = () => mySession === sessionId && presenceHistoryRequests.get(classId) === request;
-  state.presenceHistory[classId] = 'loading';
+  // Garder les séances confirmées visibles pendant le rafraîchissement réseau.
+  if (!Array.isArray(cached)) state.presenceHistory[classId] = 'loading';
   const el = document.getElementById(`pres-hist-${classId}`);
-  if (el) el.innerHTML = `<div class="pres-hist-empty">⏳ טוען היסטוריית שיעורים...</div>`;
+  if (el && !Array.isArray(cached)) el.innerHTML = `<div class="pres-hist-empty">⏳ טוען היסטוריית שיעורים...</div>`;
   try {
     const formula = encodeURIComponent(`{Classes}="${String(cls.num).replace(/"/g,'\\"')}"`);
     const fields = [FLD_PRES_ELEVE, FLD_PRES_DATE, FLD_PRES_PRESENT, FLD_PRES_PROF, FLD_PRES_CHAPITRE, FLD_PRES_LECON, FLD_PRES_MOTIF]
@@ -1658,8 +1659,12 @@ async function loadPresenceHistory(classId, force) {
     state.presenceHistory[classId] = Object.values(byDate).sort((a, b) => b.date.localeCompare(a.date)); // tri côté client
   } catch (e) {
     if (!current()) return;
-    delete state.presenceHistory[classId];
-    if (el) el.innerHTML = `<div class="pres-hist-empty">⚠️ לא ניתן לטעון את ההיסטוריה</div>`;
+    if (Array.isArray(cached)) {
+      renderPresenceHistory(classId);
+    } else {
+      delete state.presenceHistory[classId];
+      if (el) el.innerHTML = `<div class="pres-hist-empty">⚠️ לא ניתן לטעון את ההיסטוריה</div>`;
+    }
     return;
   }
   renderPresenceHistory(classId);
@@ -1789,16 +1794,14 @@ function renderPresenceHistory(classId) {
   const el = document.getElementById(`pres-hist-${classId}`);
   const sessions = state.presenceHistory[classId];
   if (!el || !Array.isArray(sessions)) return;
-  const selectedDate = document.getElementById(`pres-date-${classId}`)?.value || getTodayStr();
-  // Séances précédentes = strictement avant la date sélectionnée
-  const previous = sessions.filter(s => s.date < selectedDate);
-  if (!previous.length) {
-    el.innerHTML = `<div class="pres-hist-empty">📖 ${isDone ? 'לא נרשמה נוכחות לכיתה זו' : 'אין שיעורים קודמים רשומים לכיתה זו'}</div>`;
+  if (!sessions.length) {
+    el.innerHTML = `<div class="pres-hist-empty">📖 לא נרשמה נוכחות לכיתה זו</div>`;
     return;
   }
-  const last = previous[0];
+  // Inclure la date sélectionnée : une séance sauvegardée fait déjà partie de l'historique.
+  const last = sessions[0];
   const myName = state.teacher ? state.teacher.name : '';
-  const rows = previous.map(s => `
+  const rows = sessions.map(s => `
     <div class="pres-hist-item">
       <div class="pres-hist-row" onclick="toggleHistRow(this.parentElement)">
         <div class="pres-hist-date">${formatHistDate(s.date)}</div>
@@ -1810,11 +1813,35 @@ function renderPresenceHistory(classId) {
   const wasExpanded = el.classList.contains('expanded');
   el.innerHTML = `
     <div class="pres-hist-last">
-      <span class="pres-hist-last-label">📖 ${isDone ? 'השיעור האחרון' : 'השיעור הקודם'} (${formatHistDate(last.date)}):</span>
+      <span class="pres-hist-last-label">📖 השיעור האחרון (${formatHistDate(last.date)}):</span>
       <span>${histMaterialHtml(last)}</span>
     </div>
-    <button type="button" class="pres-hist-toggle" onclick="document.getElementById('pres-hist-${classId}').classList.toggle('expanded'); this.textContent = this.textContent.startsWith('▾') ? '▴ הסתרת ההיסטוריה' : '▾ כל השיעורים הקודמים (${previous.length})';">${wasExpanded ? '▴ הסתרת ההיסטוריה' : `▾ כל השיעורים הקודמים (${previous.length})`}</button>
+    <button type="button" class="pres-hist-toggle" onclick="document.getElementById('pres-hist-${classId}').classList.toggle('expanded'); this.textContent = this.textContent.startsWith('▾') ? '▴ הסתרת ההיסטוריה' : '▾ כל השיעורים (${sessions.length})';">${wasExpanded ? '▴ הסתרת ההיסטוריה' : `▾ כל השיעורים (${sessions.length})`}</button>
     <div class="pres-hist-list">${rows}</div>`;
+}
+
+// Mettre à jour l'affichage depuis la saisie confirmée par Airtable, sans attendre
+// une seconde lecture et sans toucher aux champs que le professeur remplit encore.
+function applySavedPresenceHistory(draft, chapter, records) {
+  const byStudent = new Map();
+  for (const record of records) {
+    const fields = record.fields;
+    const sid = (fields[FLD_PRES_ELEVE] || [])[0];
+    if (sid) byStudent.set(sid, { sid, present: !!fields[FLD_PRES_PRESENT], motif: fields[FLD_PRES_MOTIF] || '' });
+  }
+  for (const student of draft.students) {
+    byStudent.set(student.sid, { ...byStudent.get(student.sid), ...student });
+  }
+  const students = [...byStudent.values()];
+  const session = { date: draft.dateStr, chapitre: chapter, lecon: draft.lecon,
+    prof: draft.teacherName, students, total: students.length,
+    present: students.filter(student => student.present).length };
+  const cached = state.presenceHistory[draft.classId];
+  const sessions = Array.isArray(cached) ? cached.filter(item => item.date !== draft.dateStr) : [];
+  state.presenceHistory[draft.classId] = [...sessions, session].sort((a, b) => b.date.localeCompare(a.date));
+  // Une lecture commencée avant l'enregistrement ne doit pas rétablir l'ancien bilan.
+  presenceHistoryRequests.delete(draft.classId);
+  renderPresenceHistory(draft.classId);
 }
 
 function buildStudentChecklist(cls, existingMap) {
@@ -2238,6 +2265,7 @@ async function flushPresenceDraft(entry) {
       const cache = state.presenceCache[draft.classId];
       if (cache?.dateStr === draft.dateStr) cache.existingMap = existingMap;
       if (draft.dateStr === getTodayStr()) state.presenceRecordsToday[draft.classId] = existingMap;
+      applySavedPresenceHistory(draft, chapter, records);
       if (cache?.dateStr === draft.dateStr && document.getElementById(`pres-date-${draft.classId}`)?.value === draft.dateStr) {
         const badge = document.getElementById(`pres-status-${draft.classId}`);
         if (badge) { badge.style.display = 'inline-block'; badge.textContent = draft.dateStr === getTodayStr() ? '✓ נרשם היום' : '✓ נרשם לתאריך זה'; }
