@@ -302,12 +302,13 @@
       const input = document.getElementById('pres-date-' + classId);
       if (!cls || !input || input.value !== dateStr || !state.teacher) return;
       const capture = captureSession();
+      const loadedVersion = presenceSaveVersion;
       const cache = { dateStr: dateStr, existingMap: {}, loading: true };
       state.presenceCache[classId] = cache;
       const list = document.getElementById('pres-list-' + classId);
       const chapter = document.getElementById('pres-chapitre-' + classId);
       const lesson = document.getElementById('pres-lecon-' + classId);
-      const button = document.getElementById('pres-btn-' + classId);
+      const status = document.getElementById('pres-autosave-' + classId);
       const errorBox = document.getElementById('pres-error-' + classId);
       const badge = document.getElementById('pres-status-' + classId);
       const block = document.getElementById('presblock-' + classId);
@@ -316,7 +317,7 @@
           input.value === dateStr && state.presenceCache[classId] === cache;
       }
       updatePresenceDateWarning(classId);
-      if (button) button.disabled = true;
+      if (status) { status.textContent = 'טוען נוכחות…'; status.dataset.status = 'loading'; }
       for (const field of [chapter, lesson]) {
         if (field) { field.value = ''; field.disabled = true; }
       }
@@ -352,13 +353,16 @@
         if (block && records.length) block.classList.add('sent');
         cache.loading = false;
         cache.loaded = true;
-        for (const field of [chapter, lesson, button]) { if (field) field.disabled = false; }
+        for (const field of [chapter, lesson]) { if (field) field.disabled = false; }
+        if (status) { status.textContent = 'השינויים נשמרים אוטומטית לאחר 10 דקות ללא שינוי'; status.dataset.status = 'ready'; }
+        restorePresenceDraft(cls, dateStr, false, loadedVersion);
         renderPresenceHistory(classId);
       } catch (_) {
         if (!selected()) return;
         cache.loading = false;
         cache.loaded = false;
-        for (const field of [chapter, lesson, button]) { if (field) field.disabled = true; }
+        for (const field of [chapter, lesson]) { if (field) field.disabled = true; }
+        if (status) { status.textContent = 'הסנכרון ממתין לטעינת הנוכחות'; status.dataset.status = 'error'; }
         if (list) list.innerHTML = '';
         if (errorBox) errorBox.innerHTML = '<div class="error-msg">לא ניתן לטעון את הנוכחות לתאריך זה. ' +
           '<button type="button" class="btn-ghost" onclick="onPresenceDateChange(\'' + html(classId) + '\')">ניסיון נוסף</button></div>';
@@ -371,19 +375,10 @@
       const loads = state.classes.filter(function (cls) { return cls.status !== 'Complete'; }).map(function (cls) {
         const input = document.getElementById('pres-date-' + cls.id);
         if (!input) return;
-        input.value = suggestedAttendanceDate(cls.jour, today);
+        input.value = presenceDraftDate(cls.id, suggestedAttendanceDate(cls.jour, today));
         return loadAndRenderPresenceChecklist(cls.id, input.value);
       });
       return Promise.all(loads).then(function () { return result; });
-    };
-    const originalSubmit = submitPresence;
-    submitPresence = async function (classId) {
-      const input = document.getElementById('pres-date-' + classId);
-      const cache = state.presenceCache[classId];
-      if (!input || input.disabled || !cache || !cache.loaded || cache.dateStr !== input.value) return;
-      input.disabled = true;
-      try { return await originalSubmit.apply(this, arguments); }
-      finally { input.disabled = false; }
     };
     const originalReplacement = renderRemplacementConfirm;
     renderRemplacementConfirm = function () {

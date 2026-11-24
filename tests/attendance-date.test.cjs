@@ -71,7 +71,8 @@ test('la séance proposée charge ses présences et son chapitre, sans reprendre
   assert.equal(el('pres-chapitre').value, '4.2');
   assert.equal(el('pres-lecon').value, 'Séance du 2026-11-03');
   assert.equal(el('pres-status').textContent, '✓ נרשם לתאריך זה');
-  assert.equal(el('pres-btn').disabled, false);
+  assert.equal(el('pres-chapitre').disabled, false);
+  assert.equal(el('pres-btn'), null);
   assert.match(el('pres-list').innerHTML, / checked/);
   assert.equal(app.evaluate(`Object.values(state.presenceCache['${backend.classId}'].existingMap)[0].recordId`), 'recAttendance');
 });
@@ -82,7 +83,8 @@ test('au jour du cours, le formulaire conserve la date du jour', async () => {
   await app.evaluate('renderPresenceTab()');
   assert.equal(el('pres-date').value, '2026-11-05');
   assert.equal(el('pres-chapitre').value, '');
-  assert.equal(el('pres-btn').disabled, false);
+  assert.equal(el('pres-chapitre').disabled, false);
+  assert.equal(el('pres-btn'), null);
 });
 
 test('la date reste modifiable et une date hors planning garde son avertissement', async () => {
@@ -114,7 +116,8 @@ test('une réponse tardive ne remplace pas les données de la date choisie ensui
   };
   app.evaluate('getAll = __getAll;');
   const initial = app.evaluate('renderPresenceTab()');
-  assert.equal(el('pres-btn').disabled, true);
+  assert.equal(el('pres-chapitre').disabled, true);
+  assert.equal(el('pres-btn'), null);
   await app.evaluate(`submitPresence('${backend.classId}')`);
   assert.equal(backend.writes.length, 0);
   el('pres-date').value = '2026-11-02';
@@ -131,13 +134,15 @@ test('un échec de chargement bloque la sauvegarde et permet un nouvel essai', a
   await app.evaluate('prefetchClasses()');
   backend.failReads = true;
   await app.evaluate('renderPresenceTab()');
-  assert.equal(el('pres-btn').disabled, true);
+  assert.equal(el('pres-chapitre').disabled, true);
+  assert.equal(el('pres-btn'), null);
   assert.match(el('pres-error').innerHTML, /ניסיון נוסף/);
   await app.evaluate(`submitPresence('${backend.classId}')`);
   assert.equal(backend.writes.length, 0);
   backend.failReads = false;
   await app.evaluate(`onPresenceDateChange('${backend.classId}')`);
-  assert.equal(el('pres-btn').disabled, false);
+  assert.equal(el('pres-chapitre').disabled, false);
+  assert.equal(el('pres-btn'), null);
   assert.equal(el('pres-error').innerHTML, '');
 });
 
