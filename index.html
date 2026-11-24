@@ -1935,7 +1935,7 @@ function buildPresenceHtml() {
         </div>
         <div class="class-submit-area">
           <div class="submit-class-note">ניתן לתקן תאריך קודם על ידי שינוי השדה למעלה</div>
-          <div class="pres-autosave" id="pres-autosave-${cls.id}" role="status" aria-live="polite">השינויים נשמרים אוטומטית לאחר 10 דקות ללא שינוי</div>
+          <div class="pres-autosave" id="pres-autosave-${cls.id}" role="status" aria-live="polite">השינויים נשמרים אוטומטית לאחר 3 דקות ללא שינוי</div>
         </div>
       </div>
     </div>`;
@@ -2062,7 +2062,7 @@ async function syncChapitreEnCours(cls, savedDate, savedChapitre, savedSession =
 }
 
 // Saisie locale immédiate ; seule la synchronisation Airtable est temporisée.
-const PRESENCE_SAVE_DELAY = 10 * 60 * 1000;
+const PRESENCE_SAVE_DELAY = 3 * 60 * 1000;
 const PRESENCE_RETRY_DELAY = 30000;
 const presenceAutosaves = new Map();
 let presenceSaveVersion = 0;
@@ -2125,7 +2125,7 @@ function updatePresenceAutosaveStatus(entry) {
   const draft = entry.draft;
   const local = entry.persisted ? 'השינויים נשמרו במכשיר.' : 'השינויים ממתינים בזיכרון. יש להשאיר את הדף פתוח.';
   const messages = {
-    pending: local + ' סנכרון אוטומטי בעוד 10 דקות ללא שינוי.',
+    pending: local + ' סנכרון אוטומטי בעוד 3 דקות ללא שינוי.',
     saving: local + ' מסנכרן…',
     saved: '✓ הנוכחות נשמרה בהצלחה',
     invalid: local + ' להשלמת הסנכרון יש למלא פרק ושיעור בפורמט 1.3.',
@@ -2478,7 +2478,7 @@ async function confirmRemplacement(selectedDate) {
         <div class="pres-students">${listHtml}</div>
         <div id="remp-submit-error"></div>
         <div style="margin-top:12px;display:flex;gap:10px;">
-          <div class="pres-autosave" id="remp-autosave" role="status" aria-live="polite">השינויים נשמרים אוטומטית לאחר 10 דקות ללא שינוי</div>
+          <div class="pres-autosave" id="remp-autosave" role="status" aria-live="polite">השינויים נשמרים אוטומטית לאחר 3 דקות ללא שינוי</div>
           <button class="btn-ghost" onclick="cancelRemplacement()">סגירה</button>
         </div>
       </div>`;

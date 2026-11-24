@@ -30,7 +30,7 @@ async function setup(options = {}) {
     storageKey: 'lavi_presence_drafts_v1:' + actor.id };
 }
 
-const SAVE_DELAY = 10 * 60 * 1000;
+const SAVE_DELAY = 3 * 60 * 1000;
 
 const presenceWrites = backend => backend.writes.filter(write => write.table === F.presence);
 const draftText = fixture => fixture.storage.getItem(fixture.storageKey) || '';
@@ -42,7 +42,7 @@ test('ouvrir les présences ne crée rien et ne propose plus de bouton de sauveg
   assert.equal(el('pres-btn'), null);
 });
 
-test('chaque saisie est mémorisée immédiatement et repousse la synchronisation de dix minutes', async () => {
+test('chaque saisie est mémorisée immédiatement et repousse la synchronisation de trois minutes', async () => {
   const fixture = await setup();
   const { backend, timers, edit, el } = fixture;
   edit('4.3', 'Diapositive 12');
@@ -290,22 +290,22 @@ test('une réponse tardive de l’historique après sauvegarde ne modifie pas le
   assert.equal(fixture.app.evaluate('Object.keys(state.presenceHistory).length'), 0);
 });
 
-test('recharger après neuf minutes conserve la minute restante avant synchronisation', async () => {
+test('recharger après deux minutes conserve la minute restante avant synchronisation', async () => {
   const fixture = await setup();
   fixture.edit('4.3', 'Délai conservé');
   const restored = await setup({ backend: fixture.backend, storage: fixture.storage,
-    now: new Date(new Date(NOW).getTime() + 9 * 60 * 1000).toISOString() });
+    now: new Date(new Date(NOW).getTime() + 2 * 60 * 1000).toISOString() });
   await restored.timers.advance(59999);
   assert.equal(presenceWrites(restored.backend).length, 0);
   await restored.timers.advance(1);
   assert.equal(restored.backend.data[F.presence][0].fields[F.pLesson], 'Délai conservé');
 });
 
-test('un brouillon vieux de plus de dix minutes est synchronisé dès la reprise', async () => {
+test('un brouillon vieux de plus de trois minutes est synchronisé dès la reprise', async () => {
   const fixture = await setup();
   fixture.edit('4.3', 'Délai écoulé');
   const restored = await setup({ backend: fixture.backend, storage: fixture.storage,
-    now: new Date(new Date(NOW).getTime() + 11 * 60 * 1000).toISOString() });
+    now: new Date(new Date(NOW).getTime() + 4 * 60 * 1000).toISOString() });
   await restored.timers.advance(0);
   assert.equal(restored.backend.data[F.presence][0].fields[F.pLesson], 'Délai écoulé');
 });

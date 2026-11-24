@@ -354,7 +354,7 @@
         cache.loading = false;
         cache.loaded = true;
         for (const field of [chapter, lesson]) { if (field) field.disabled = false; }
-        if (status) { status.textContent = 'השינויים נשמרים אוטומטית לאחר 10 דקות ללא שינוי'; status.dataset.status = 'ready'; }
+        if (status) { status.textContent = 'השינויים נשמרים אוטומטית לאחר 3 דקות ללא שינוי'; status.dataset.status = 'ready'; }
         restorePresenceDraft(cls, dateStr, false, loadedVersion);
         renderPresenceHistory(classId);
       } catch (_) {

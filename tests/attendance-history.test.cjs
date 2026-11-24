@@ -2,7 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const { makeBackend, loadApp, makeStorage, makeTimers, F, NOW } = require('./notifications-fixture.cjs');
 
-const SAVE_DELAY = 10 * 60 * 1000;
+const SAVE_DELAY = 3 * 60 * 1000;
 const settle = async () => { for (let turn = 0; turn < 40; turn++) await Promise.resolve(); };
 
 async function setup(studentCount = 2) {
